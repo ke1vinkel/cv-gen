@@ -8,7 +8,9 @@ import {
   useState,
 } from "react"
 
+import { useLanguage } from "@/components/language-provider"
 import type { CvContent, Education, Experience } from "@/lib/cv-schema"
+import type { Translator } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 const A4_WIDTH = 794
@@ -52,10 +54,21 @@ function newestFirst<T extends { startDate: string; endDate: string }>(
   })
 }
 
-function DateRange({ start, end }: { start: string; end: string }) {
+function DateRange({
+  start,
+  end,
+  t,
+}: {
+  start: string
+  end: string
+  t: Translator
+}) {
   if (!start && !end) return null
+  const dates = [start, end]
+    .filter(Boolean)
+    .map((date) => (date === "Present" ? t("Present") : date))
   return (
-    <span className="cv-date">{[start, end].filter(Boolean).join(" - ")}</span>
+    <span className="cv-date">{dates.join(" - ")}</span>
   )
 }
 
@@ -63,10 +76,12 @@ function ExperienceBlock({
   experience,
   showHeading,
   compact,
+  t,
 }: {
   experience: Experience
   showHeading: boolean
   compact: boolean
+  t: Translator
 }) {
   return (
     <section
@@ -77,11 +92,15 @@ function ExperienceBlock({
       )}
       data-cv-block
     >
-      {showHeading && <h2>Experience</h2>}
+      {showHeading && <h2>{t("Experience")}</h2>}
       <div className="cv-entry">
         <div className="cv-entry-head">
           <strong>{experience.role}</strong>
-          <DateRange start={experience.startDate} end={experience.endDate} />
+          <DateRange
+            start={experience.startDate}
+            end={experience.endDate}
+            t={t}
+          />
         </div>
         <p className="cv-subtitle">
           {experience.url ? (
@@ -116,10 +135,12 @@ function EducationBlock({
   education,
   showHeading,
   compact,
+  t,
 }: {
   education: Education
   showHeading: boolean
   compact: boolean
+  t: Translator
 }) {
   return (
     <section
@@ -130,11 +151,11 @@ function EducationBlock({
       )}
       data-cv-block
     >
-      {showHeading && <h2>Education</h2>}
+      {showHeading && <h2>{t("Education")}</h2>}
       <div className="cv-entry">
         <div className="cv-entry-head">
           <strong>{education.degree}</strong>
-          <DateRange start={education.startDate} end={education.endDate} />
+          <DateRange start={education.startDate} end={education.endDate} t={t} />
         </div>
         <p className="cv-subtitle">
           {education.institution}
@@ -145,7 +166,7 @@ function EducationBlock({
   )
 }
 
-function buildBlocks(content: CvContent): ReactNode[] {
+function buildBlocks(content: CvContent, t: Translator): ReactNode[] {
   const blocks: ReactNode[] = []
   const contact = [
     content.contact.phone,
@@ -157,7 +178,7 @@ function buildBlocks(content: CvContent): ReactNode[] {
   if (content.visibility?.personal ?? true) {
     blocks.push(
       <header className="cv-header" data-cv-block key="personal">
-        <h1>{content.name || "Your name"}</h1>
+        <h1>{content.name || t("Your name")}</h1>
         {contact.length > 0 && (
           <address>
             {contact.map((item) => (
@@ -172,7 +193,7 @@ function buildBlocks(content: CvContent): ReactNode[] {
   if ((content.visibility?.summary ?? true) && content.summary) {
     blocks.push(
       <section className="cv-section" data-cv-block key="summary">
-        <h2>Summary</h2>
+        <h2>{t("Summary")}</h2>
         <p className="cv-summary">{content.summary}</p>
       </section>
     )
@@ -190,6 +211,7 @@ function buildBlocks(content: CvContent): ReactNode[] {
           experience={experience}
           showHeading={index === 0}
           compact={index < experiences.length - 1}
+          t={t}
         />
       )
     })
@@ -204,6 +226,7 @@ function buildBlocks(content: CvContent): ReactNode[] {
           education={item}
           showHeading={index === 0}
           compact={index < education.length - 1}
+          t={t}
         />
       )
     })
@@ -212,7 +235,7 @@ function buildBlocks(content: CvContent): ReactNode[] {
   if ((content.visibility?.skills ?? true) && content.skills.length > 0) {
     blocks.push(
       <section className="cv-section" data-cv-block key="skills">
-        <h2>Skills</h2>
+        <h2>{t("Skills")}</h2>
         <ul className="cv-skills">
           {content.skills.map((skill) => (
             <li key={skill}>{skill}</li>
@@ -225,13 +248,13 @@ function buildBlocks(content: CvContent): ReactNode[] {
   if ((content.visibility?.languages ?? true) && content.languages.length > 0) {
     blocks.push(
       <section className="cv-section" data-cv-block key="languages">
-        <h2>Languages</h2>
+        <h2>{t("Languages")}</h2>
         <div className="cv-languages">
           {content.languages.map((language) => (
             <div className="cv-language" key={language.id}>
               <span className="cv-language-name">{language.language}</span>
               {language.proficiency !== "Not Rated" && (
-                <span>{language.proficiency}</span>
+                <span>{t(language.proficiency)}</span>
               )}
             </div>
           ))}
@@ -250,9 +273,10 @@ export function CvPreview({
   content: CvContent
   className?: string
 }) {
+  const { t } = useLanguage()
   const documentRef = useRef<HTMLDivElement>(null)
   const measurementRef = useRef<HTMLDivElement>(null)
-  const blocks = useMemo(() => buildBlocks(content), [content])
+  const blocks = useMemo(() => buildBlocks(content, t), [content, t])
   const [pages, setPages] = useState<number[][]>(() => [
     blocks.map((_, index) => index),
   ])
@@ -316,7 +340,10 @@ export function CvPreview({
           <article
             className={cn("cv-paper", className)}
             style={{ transform: `scale(${scale})` }}
-            aria-label={`CV preview page ${pageIndex + 1} of ${pages.length}`}
+            aria-label={t("CV preview page {{page}} of {{total}}", {
+              page: pageIndex + 1,
+              total: pages.length,
+            })}
           >
             {page.map((blockIndex) => blocks[blockIndex])}
           </article>

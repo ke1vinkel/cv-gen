@@ -3,9 +3,12 @@ import { redirect } from "next/navigation"
 import { AuthForm } from "@/components/auth-form"
 import { Brand } from "@/components/brand"
 import { CvPreview } from "@/components/cv-preview"
+import { LanguageToggle } from "@/components/language-toggle"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { getSessionUser } from "@/lib/auth"
 import type { CvContent } from "@/lib/cv-schema"
+import { translate } from "@/lib/i18n"
+import { getLocale } from "@/lib/locale"
 
 export const metadata = { title: "Sign in" }
 
@@ -36,7 +39,7 @@ const sampleCv: CvContent = {
     {
       id: "sample-education",
       degree: "Computer Science",
-      institution: "BINUS University",
+      institution: "Nusantara University",
       startDate: "09/2022",
       endDate: "Present",
       details: "Bachelor's Degree",
@@ -48,33 +51,34 @@ const sampleCv: CvContent = {
 
 export default async function LoginPage() {
   if (await getSessionUser()) redirect("/dashboard")
+  const locale = await getLocale()
+  const t = (message: string) => translate(locale, message)
 
   return (
     <main className="grid min-h-[100dvh] lg:grid-cols-[0.78fr_1.22fr]">
       <section className="ui-page-enter flex min-h-[100dvh] flex-col px-5 py-5 sm:px-10 sm:py-8 lg:px-12">
         <div className="flex items-center justify-between">
           <Brand />
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
 
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-12">
           <p className="mb-4 text-sm font-medium text-primary">
-            Internal access
+            {t("Internal access")}
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Sign in to CV Gen
+            {t("Sign in to CV Gen")}
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Student and lecturer accounts can continue with their assigned
-            university email and password.
-          </p>
           <div className="mt-8">
             <AuthForm />
           </div>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Accounts are managed internally.
+          {t("Accounts are managed internally.")}
         </p>
       </section>
 

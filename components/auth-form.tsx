@@ -7,9 +7,11 @@ import { FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useLanguage } from "@/components/language-provider"
 
 export function AuthForm() {
   const router = useRouter()
+  const { t } = useLanguage()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState("")
 
@@ -30,7 +32,7 @@ export function AuthForm() {
     const data = (await response.json().catch(() => ({}))) as { error?: string }
 
     if (!response.ok) {
-      setError(data.error ?? "Something went wrong. Try again.")
+      setError(t(data.error ?? "Something went wrong. Try again."))
       setPending(false)
       return
     }
@@ -42,7 +44,7 @@ export function AuthForm() {
   return (
     <form className="space-y-5" autoComplete="off" onSubmit={submit}>
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t("Email")}</Label>
         <Input
           id="email"
           name="email"
@@ -52,14 +54,14 @@ export function AuthForm() {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="nim">Password</Label>
+        <Label htmlFor="nim">{t("Password")}</Label>
         <Input
           id="nim"
           name="nim"
           type="password"
           minLength={1}
           maxLength={20}
-          placeholder="Enter your password"
+          placeholder={t("Enter your password")}
           required
         />
       </div>
@@ -79,7 +81,7 @@ export function AuthForm() {
         ) : (
           <ArrowRight data-icon="inline-end" />
         )}
-        {pending ? "Please wait" : "Sign in"}
+        {t(pending ? "Please wait" : "Sign in")}
       </Button>
     </form>
   )

@@ -389,6 +389,28 @@ body {
   text-align: right;
 }
 
+.lecturer-student-group {
+  grid-column: span 1;
+}
+
+.lecturer-student-cvs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 640px) {
+  .lecturer-student-group {
+    grid-column: span var(--student-cv-span);
+  }
+
+  .lecturer-student-cvs {
+    grid-template-columns: repeat(
+      var(--student-cv-span),
+      minmax(0, 1fr)
+    );
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   @keyframes ui-enter {
     from {

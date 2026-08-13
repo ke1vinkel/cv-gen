@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 
 import { CvPreview } from "@/components/cv-preview"
+import { useLanguage } from "@/components/language-provider"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,8 +71,8 @@ export function CvThumbnail({ cv }: { cv: CvRecord }) {
   )
 }
 
-function formatUpdated(value: string) {
-  return new Intl.DateTimeFormat("en", {
+function formatUpdated(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale === "id" ? "id-ID" : "en", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -80,6 +81,7 @@ function formatUpdated(value: string) {
 
 export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
   const router = useRouter()
+  const { locale, t } = useLanguage()
   const [cvs, setCvs] = useState(initialCvs)
   const [pending, setPending] = useState(false)
   const [pendingAction, setPendingAction] = useState("")
@@ -92,12 +94,12 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
     const response = await fetch("/api/cvs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "Untitled CV" }),
+      body: JSON.stringify({ title: t("Untitled CV") }),
     })
     const data = (await response.json()) as { cv?: CvRecord; error?: string }
 
     if (!response.ok || !data.cv) {
-      setError(data.error ?? "Could not create the CV.")
+      setError(t(data.error ?? "Could not create the CV."))
       setPending(false)
       return
     }
@@ -112,7 +114,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
     if (response.ok) {
       setCvs((items) => items.filter((item) => item.id !== id))
     } else {
-      setError("Could not delete the CV.")
+      setError(t("Could not delete the CV."))
     }
     setPendingAction("")
   }
@@ -127,7 +129,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
     const data = (await response.json()) as { cv?: CvRecord; error?: string }
 
     if (!response.ok || !data.cv) {
-      setError(data.error ?? "Could not duplicate the CV.")
+      setError(t(data.error ?? "Could not duplicate the CV."))
       setPendingAction("")
       return
     }
@@ -142,20 +144,22 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
             <h2 id="library-title" className="text-xl font-semibold">
-              Recent CVs
+              {t("Recent CVs")}
             </h2>
             {error && <p className="mt-1 text-sm text-destructive">{error}</p>}
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">
-              {cvs.length} {cvs.length === 1 ? "document" : "documents"}
+              {t(cvs.length === 1 ? "{{count}} document" : "{{count}} documents", {
+                count: cvs.length,
+              })}
             </span>
             <Button
               size="icon-lg"
               onClick={create}
               disabled={pending}
-              aria-label={pending ? "Creating CV" : "Create a new CV"}
-              title="Create a new CV"
+              aria-label={t(pending ? "Creating CV" : "Create a new CV")}
+              title={t("Create a new CV")}
               className="shadow-[0_6px_18px_rgba(15,92,145,0.2)]"
             >
               <Plus className="size-5" />
@@ -168,10 +172,13 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
             <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-muted">
               <FileText className="size-5 text-muted-foreground" />
             </div>
-            <h2 className="text-lg font-semibold">Your CV library is empty</h2>
+            <h2 className="text-lg font-semibold">
+              {t("Your CV library is empty")}
+            </h2>
             <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Use the plus button to create your first CV. You can keep separate
-              versions for different roles.
+              {t(
+                "Use the plus button to create your first CV. You can keep separate versions for different roles."
+              )}
             </p>
           </section>
         ) : (
@@ -190,7 +197,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                         className={cn(
                           buttonVariants({ variant: "ghost", size: "icon-sm" })
                         )}
-                        aria-label={`Edit ${cv.title}`}
+                        aria-label={t("Edit {{title}}", { title: cv.title })}
                       >
                         <Pencil />
                       </Link>
@@ -200,7 +207,9 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                     <CvThumbnail cv={cv} />
                     <div>
                       <span className="text-xs text-muted-foreground">
-                        Updated {formatUpdated(cv.updatedAt)}
+                        {t("Updated {{date}}", {
+                          date: formatUpdated(cv.updatedAt, locale),
+                        })}
                       </span>
                     </div>
                     <div className="grid gap-1 border-t pt-3">
@@ -212,7 +221,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                         )}
                       >
                         <Pencil data-icon="inline-start" />
-                        Edit
+                        {t("Edit")}
                       </Link>
                       <Button
                         variant="ghost"
@@ -223,8 +232,8 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                       >
                         <Copy data-icon="inline-start" />
                         {pendingAction === `duplicate-${cv.id}`
-                          ? "Duplicating..."
-                          : "Duplicate"}
+                          ? t("Duplicating...")
+                          : t("Duplicate")}
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger
@@ -238,23 +247,27 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                           }
                         >
                           <Trash2 data-icon="inline-start" />
-                          Delete
+                          {t("Delete")}
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete this CV?</AlertDialogTitle>
+                            <AlertDialogTitle>
+                              {t("Delete this CV?")}
+                            </AlertDialogTitle>
                             <AlertDialogDescription>
-                              This permanently removes {cv.title}. This action
-                              cannot be undone.
+                              {t(
+                                "This permanently removes {{title}}. This action cannot be undone.",
+                                { title: cv.title }
+                              )}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
                             <AlertDialogAction
                               variant="destructive"
                               onClick={() => remove(cv.id)}
                             >
-                              Delete
+                              {t("Delete")}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -269,7 +282,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                         )}
                       >
                         <Download data-icon="inline-start" />
-                        Download
+                        {t("Download")}
                       </Link>
                     </div>
                   </CardContent>

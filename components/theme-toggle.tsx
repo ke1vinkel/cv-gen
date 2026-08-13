@@ -5,9 +5,11 @@ import { useTheme } from "next-themes"
 import { useSyncExternalStore } from "react"
 
 import { Button } from "@/components/ui/button"
+import { useLanguage } from "@/components/language-provider"
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
+  const { t } = useLanguage()
   const mounted = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -16,7 +18,12 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button size="icon-sm" variant="ghost" aria-label="Toggle theme" disabled>
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        aria-label={t("Toggle theme")}
+        disabled
+      >
         <Sun />
       </Button>
     )
@@ -28,7 +35,7 @@ export function ThemeToggle() {
     <Button
       size="icon-sm"
       variant="ghost"
-      aria-label={`Switch to ${isDark ? "light" : "dark"} theme`}
+      aria-label={t(`Switch to ${isDark ? "light" : "dark"} theme`)}
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >
       {isDark ? <Sun /> : <Moon />}

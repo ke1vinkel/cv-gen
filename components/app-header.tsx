@@ -1,6 +1,10 @@
+"use client"
+
 import Link from "next/link"
 
 import { Brand } from "@/components/brand"
+import { LanguageToggle } from "@/components/language-toggle"
+import { useLanguage } from "@/components/language-provider"
 import { LogoutButton } from "@/components/logout-button"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -13,6 +17,8 @@ export function AppHeader({
   role: "student" | "lecturer"
   navigationLabel?: string
 }) {
+  const { t } = useLanguage()
+
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-16">
@@ -22,13 +28,14 @@ export function AppHeader({
             href="/dashboard"
             className="hidden text-sm text-muted-foreground transition-colors hover:text-foreground sm:block"
           >
-            {navigationLabel}
+            {t(navigationLabel)}
           </Link>
         </div>
         <div className="flex items-center gap-1">
           <span className="hidden max-w-64 truncate px-2 text-xs text-muted-foreground md:block">
-            {name} | {role === "lecturer" ? "Lecturer" : "Student"}
+            {name} | {t(role === "lecturer" ? "Lecturer" : "Student")}
           </span>
+          <LanguageToggle />
           <ThemeToggle />
           <LogoutButton />
         </div>

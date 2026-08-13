@@ -36,6 +36,8 @@ import {
 } from "react"
 
 import { CvPreview } from "@/components/cv-preview"
+import { LanguageToggle } from "@/components/language-toggle"
+import { useLanguage } from "@/components/language-provider"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -54,6 +56,7 @@ import type {
   Experience,
   Language,
 } from "@/lib/cv-schema"
+import type { Translator } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
@@ -81,6 +84,7 @@ function FormattingTextarea({
   rows?: number
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
+  const { t } = useLanguage()
 
   function replaceSelection(prefix: string, suffix = prefix) {
     const textarea = ref.current
@@ -182,7 +186,7 @@ function FormattingTextarea({
           size="icon"
           className={toolClass}
           onClick={() => replaceSelection("**")}
-          aria-label="Bold"
+          aria-label={t("Bold")}
         >
           <Bold />
         </Button>
@@ -192,7 +196,7 @@ function FormattingTextarea({
           size="icon"
           className={toolClass}
           onClick={() => replaceSelection("*")}
-          aria-label="Italic"
+          aria-label={t("Italic")}
         >
           <Italic />
         </Button>
@@ -202,7 +206,7 @@ function FormattingTextarea({
           size="icon"
           className={toolClass}
           onClick={() => replaceSelection("__")}
-          aria-label="Underline"
+          aria-label={t("Underline")}
         >
           <Underline />
         </Button>
@@ -212,7 +216,7 @@ function FormattingTextarea({
           size="icon"
           className={toolClass}
           onClick={() => replaceSelection("[", "](https://)")}
-          aria-label="Add link"
+          aria-label={t("Add link")}
         >
           <Link2 />
         </Button>
@@ -222,7 +226,7 @@ function FormattingTextarea({
           size="icon"
           className={toolClass}
           onClick={toggleList}
-          aria-label="Toggle bullet list"
+          aria-label={t("Toggle bullet list")}
         >
           <ListIcon />
         </Button>
@@ -232,7 +236,7 @@ function FormattingTextarea({
           variant="ghost"
           size="icon"
           className={toolClass}
-          aria-label="Align left"
+          aria-label={t("Align left")}
           disabled
         >
           <AlignLeft />
@@ -260,6 +264,7 @@ function FormField({
   className?: string
   children: React.ReactNode
 }) {
+  const { t } = useLanguage()
   const id = useId()
   const control = isValidElement<{ id?: string }>(children)
     ? cloneElement(children, { id })
@@ -267,7 +272,7 @@ function FormField({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id}>{t(label)}</Label>
       {control}
     </div>
   )
@@ -296,6 +301,7 @@ function EditorSection({
   onBack: () => void
   onToggleVisibility: () => void
 }) {
+  const { t } = useLanguage()
   if (activeSection && activeSection !== section) return null
 
   if (!activeSection) {
@@ -311,14 +317,17 @@ function EditorSection({
               {icon}
             </span>
             <span className="min-w-0 flex-1 text-lg font-medium tracking-tight">
-              {title}
+              {t(title)}
             </span>
           </button>
           <button
             type="button"
             onClick={onToggleVisibility}
             className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            aria-label={`${visible ? "Hide" : "Show"} ${title} in CV`}
+            aria-label={t(
+              visible ? "Hide {{section}} in CV" : "Show {{section}} in CV",
+              { section: t(title) }
+            )}
             aria-pressed={!visible}
           >
             {visible ? (
@@ -331,7 +340,7 @@ function EditorSection({
             type="button"
             onClick={onOpen}
             className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            aria-label={`Edit ${title}`}
+            aria-label={t("Edit {{title}}", { title: t(title) })}
           >
             <ChevronRight className="size-5" />
           </button>
@@ -348,19 +357,22 @@ function EditorSection({
           variant="outline"
           size="icon"
           onClick={onBack}
-          aria-label="Back to sections"
+          aria-label={t("Back to sections")}
         >
           <ArrowLeft />
         </Button>
         <h2 className="min-w-0 flex-1 text-2xl font-semibold tracking-tight">
-          {title}
+          {t(title)}
         </h2>
         <Button
           type="button"
           variant="ghost"
           size="icon"
           onClick={onToggleVisibility}
-          aria-label={`${visible ? "Hide" : "Show"} ${title} in CV`}
+          aria-label={t(
+            visible ? "Hide {{section}} in CV" : "Show {{section}} in CV",
+            { section: t(title) }
+          )}
           aria-pressed={!visible}
         >
           {visible ? <Eye /> : <EyeOff />}
@@ -392,6 +404,7 @@ function DateField({
   allowPresent?: boolean
   onChange: (value: string) => void
 }) {
+  const { t } = useLanguage()
   const id = useId()
   const isPresent = value === "Present"
 
@@ -409,7 +422,7 @@ function DateField({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id}>{t(label)}</Label>
       <div className="flex gap-2">
         <Input
           id={id}
@@ -420,7 +433,7 @@ function DateField({
           maxLength={7}
           pattern="(0[1-9]|1[0-2])/\d{4}"
           disabled={isPresent}
-          aria-label={`${label}, MM/YYYY`}
+          aria-label={`${t(label)}, MM/YYYY`}
           onChange={(event) => updateValue(event.target.value)}
         />
         {allowPresent && (
@@ -431,7 +444,7 @@ function DateField({
             aria-pressed={isPresent}
             onClick={() => onChange(isPresent ? "" : "Present")}
           >
-            Present
+            {t("Present")}
           </Button>
         )}
       </div>
@@ -439,11 +452,11 @@ function DateField({
   )
 }
 
-function blankExperience(): Experience {
+function blankExperience(t: Translator): Experience {
   return {
     id: crypto.randomUUID(),
-    role: "New role",
-    organization: "Organization",
+    role: t("New role"),
+    organization: t("Organization"),
     url: "",
     startDate: "",
     endDate: "",
@@ -452,11 +465,11 @@ function blankExperience(): Experience {
   }
 }
 
-function blankEducation(): Education {
+function blankEducation(t: Translator): Education {
   return {
     id: crypto.randomUUID(),
-    degree: "Degree or programme",
-    institution: "Institution",
+    degree: t("Degree or programme"),
+    institution: t("Institution"),
     fieldOfStudy: "",
     url: "",
     startDate: "",
@@ -474,6 +487,7 @@ function blankLanguage(language = ""): Language {
 }
 
 export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
+  const { t } = useLanguage()
   const [title, setTitle] = useState(initialCv.title)
   const [content, setContent] = useState<CvContent>(initialCv.content)
   const [activeSection, setActiveSection] = useState<SectionKey | null>(null)
@@ -512,7 +526,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
       if (!isDirtyRef.current || !hasHistoryGuard.current) return
 
       window.history.forward()
-      setMessage("Save your changes before leaving.")
+      setMessage(t("Save your changes before leaving."))
     }
 
     window.addEventListener("beforeunload", warnBeforeUnload)
@@ -522,7 +536,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
       window.removeEventListener("beforeunload", warnBeforeUnload)
       window.removeEventListener("popstate", blockBackNavigation)
     }
-  }, [])
+  }, [t])
 
   function markDirty() {
     editRevision.current += 1
@@ -605,7 +619,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
 
       if (!response.ok) {
         setSaveState("error")
-        setMessage(data.error ?? "Could not save your changes.")
+        setMessage(t(data.error ?? "Could not save your changes."))
         return
       }
 
@@ -626,7 +640,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
       }
     } catch {
       setSaveState("error")
-      setMessage("Could not connect to the server. Try saving again.")
+      setMessage(t("Could not connect to the server. Try saving again."))
     }
   }
 
@@ -637,13 +651,13 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Link
               href="/dashboard"
-              aria-label="Back to dashboard"
+              aria-label={t("Back to dashboard")}
               aria-disabled={isDirty}
               onNavigate={(event) => {
                 if (!isDirty) return
 
                 event.preventDefault()
-                setMessage("Save your changes before leaving.")
+                setMessage(t("Save your changes before leaving."))
               }}
               className={cn(
                 buttonVariants({ variant: "outline", size: "icon-sm" }),
@@ -659,7 +673,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 setTitle(event.target.value)
                 markDirty()
               }}
-              aria-label="CV title"
+              aria-label={t("CV title")}
               maxLength={100}
               className="min-w-0 max-w-md bg-transparent text-base font-semibold"
             />
@@ -675,13 +689,14 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               role="status"
             >
               {saveState === "saved"
-                ? "Saved"
+                ? t("Saved")
                 : saveState === "error"
                   ? message
                   : isDirty
-                    ? message || "Unsaved changes"
-                    : "Changes are saved manually"}
+                    ? message || t("Unsaved changes")
+                    : t("Changes are saved manually")}
             </span>
+            <LanguageToggle />
             <Link
               href={`/cvs/${initialCv.id}/preview`}
               aria-disabled={isDirty}
@@ -689,7 +704,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 if (!isDirty) return
 
                 event.preventDefault()
-                setMessage("Save your changes before leaving.")
+                setMessage(t("Save your changes before leaving."))
               }}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
@@ -697,7 +712,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               )}
             >
               <Eye data-icon="inline-start" />
-              Preview
+              {t("Preview")}
             </Link>
             <Button size="sm" onClick={save} disabled={saveState === "saving"}>
               {saveState === "saving" ? (
@@ -710,7 +725,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               ) : (
                 <Save data-icon="inline-start" />
               )}
-              {saveState === "saving" ? "Saving" : "Save"}
+              {t(saveState === "saving" ? "Saving" : "Save")}
             </Button>
           </div>
         </div>
@@ -811,12 +826,14 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
           >
             <div>
               <Textarea
-                aria-label="Summary"
+                aria-label={t("Summary")}
                 value={content.summary}
                 onChange={(event) =>
                   updateContent({ summary: event.target.value })
                 }
-                placeholder="Write a concise profile focused on the role you want."
+                placeholder={t(
+                  "Write a concise profile focused on the role you want."
+                )}
                 rows={5}
                 maxLength={2000}
               />
@@ -840,18 +857,19 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 className="h-12 w-full rounded-xl border-dashed bg-transparent text-base hover:border-foreground/30"
                 onClick={() =>
                   updateContent({
-                    experiences: [...content.experiences, blankExperience()],
+                    experiences: [...content.experiences, blankExperience(t)],
                   })
                 }
               >
-                <Plus data-icon="inline-start" /> Add Experience
+                <Plus data-icon="inline-start" /> {t("Add Experience")}
               </Button>
             </div>
             <div className="space-y-8">
               {content.experiences.length === 0 && (
                 <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                  Add internships, employment, freelance work, or substantial
-                  projects.
+                  {t(
+                    "Add internships, employment, freelance work, or substantial projects."
+                  )}
                 </p>
               )}
               {content.experiences.map((experience) => (
@@ -864,7 +882,9 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                       variant="ghost"
                       size="sm"
                       className="text-muted-foreground hover:text-destructive"
-                      aria-label={`Remove ${experience.role}`}
+                      aria-label={t("Remove {{item}}", {
+                        item: experience.role,
+                      })}
                       onClick={() =>
                         updateContent({
                           experiences: content.experiences.filter(
@@ -873,7 +893,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                         })
                       }
                     >
-                      Delete <Trash2 data-icon="inline-end" />
+                      {t("Delete")} <Trash2 data-icon="inline-end" />
                     </Button>
                   </div>
                   <div className="space-y-5">
@@ -942,7 +962,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                             .filter(Boolean)
                             .join("\n")
                         }
-                        placeholder="Describe your accomplishments"
+                        placeholder={t("Describe your accomplishments")}
                         rows={4}
                         onChange={(value) => {
                           setHighlightsText((current) => ({
@@ -986,18 +1006,19 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 className="h-12 w-full rounded-xl border-dashed bg-transparent text-base font-medium"
                 onClick={() =>
                   updateContent({
-                    education: [...content.education, blankEducation()],
+                    education: [...content.education, blankEducation(t)],
                   })
                 }
               >
-                <Plus data-icon="inline-start" /> Add education
+                <Plus data-icon="inline-start" /> {t("Add education")}
               </Button>
             </div>
             <div className="space-y-4">
               {content.education.length === 0 && (
                 <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                  Add your university, school, certification, or other relevant
-                  study.
+                  {t(
+                    "Add your university, school, certification, or other relevant study."
+                  )}
                 </p>
               )}
               {content.education.map((education) => (
@@ -1010,7 +1031,9 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                       variant="ghost"
                       size="sm"
                       className="text-muted-foreground hover:text-destructive"
-                      aria-label={`Remove ${education.degree}`}
+                      aria-label={t("Remove {{item}}", {
+                        item: education.degree,
+                      })}
                       onClick={() =>
                         updateContent({
                           education: content.education.filter(
@@ -1019,16 +1042,16 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                         })
                       }
                     >
-                      Delete <Trash2 data-icon="inline-end" />
+                      {t("Delete")} <Trash2 data-icon="inline-end" />
                     </Button>
                   </div>
                   <div className="space-y-4">
                     <label className="block">
-                      <span className="sr-only">University/School</span>
+                      <span className="sr-only">{t("University/School")}</span>
                       <Input
                         className="h-12 rounded-xl px-4"
                         value={education.institution}
-                        placeholder="University/School"
+                        placeholder={t("University/School")}
                         onChange={(event) =>
                           updateEducation(education.id, {
                             institution: event.target.value,
@@ -1037,11 +1060,13 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                       />
                     </label>
                     <label className="block">
-                      <span className="sr-only">Degree</span>
+                      <span className="sr-only">{t("Degree")}</span>
                       <Input
                         className="h-12 rounded-xl px-4"
                         value={education.degree}
-                        placeholder="Degree (e.g. Bachelor's degree, High school diploma)"
+                        placeholder={t(
+                          "Degree (e.g. Bachelor's degree, High school diploma)"
+                        )}
                         onChange={(event) =>
                           updateEducation(education.id, {
                             degree: event.target.value,
@@ -1050,11 +1075,11 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                       />
                     </label>
                     <label className="block">
-                      <span className="sr-only">Field of Study</span>
+                      <span className="sr-only">{t("Field of Study")}</span>
                       <Input
                         className="h-12 rounded-xl px-4"
                         value={education.fieldOfStudy ?? ""}
-                        placeholder="Field of Study"
+                        placeholder={t("Field of Study")}
                         onChange={(event) =>
                           updateEducation(education.id, {
                             fieldOfStudy: event.target.value,
@@ -1063,12 +1088,14 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                       />
                     </label>
                     <label className="block">
-                      <span className="sr-only">Relevant URL (Optional)</span>
+                      <span className="sr-only">
+                        {t("Relevant URL (Optional)")}
+                      </span>
                       <Input
                         className="h-12 rounded-xl px-4"
                         type="url"
                         value={education.url ?? ""}
-                        placeholder="Relevant URL (Optional)"
+                        placeholder={t("Relevant URL (Optional)")}
                         onChange={(event) =>
                           updateEducation(education.id, {
                             url: event.target.value,
@@ -1094,10 +1121,10 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                       />
                     </div>
                     <label className="block">
-                      <span className="sr-only">Achievements</span>
+                      <span className="sr-only">{t("Achievements")}</span>
                       <FormattingTextarea
                         value={education.details}
-                        placeholder="Achievements"
+                        placeholder={t("Achievements")}
                         rows={6}
                         onChange={(details) =>
                           updateEducation(education.id, {
@@ -1126,7 +1153,9 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             <div>
               <FormattingTextarea
                 value={skillsText}
-                placeholder="Add skills, then use the list button for bullets"
+                placeholder={t(
+                  "Add skills, then use the list button for bullets"
+                )}
                 rows={6}
                 onChange={(value) => {
                   setSkillsText(value)
@@ -1162,14 +1191,16 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                   })
                 }
               >
-                <Plus data-icon="inline-start" /> Add
+                <Plus data-icon="inline-start" /> {t("Add")}
               </Button>
             </div>
 
             <div className="space-y-4">
               {content.languages.length === 0 && (
                 <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                  Add the languages you can use and your proficiency level.
+                  {t(
+                    "Add the languages you can use and your proficiency level."
+                  )}
                 </p>
               )}
               {content.languages.map((language) => (
@@ -1180,7 +1211,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                   <FormField label="Language">
                     <Input
                       value={language.language}
-                      placeholder="Language"
+                      placeholder={t("Language")}
                       maxLength={200}
                       onChange={(event) =>
                         updateLanguage(language.id, {
@@ -1191,14 +1222,16 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                   </FormField>
                   <div className="space-y-2">
                     <Label htmlFor={`language-proficiency-${language.id}`}>
-                      Proficiency
+                      {t("Proficiency")}
                     </Label>
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         id={`language-proficiency-${language.id}`}
                         className="group flex h-10 w-full items-center justify-between rounded-xl border border-border/70 bg-background px-3.5 text-sm font-medium shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] outline-none hover:border-foreground/20 hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 data-popup-open:border-ring/70 data-popup-open:bg-muted/50 data-popup-open:ring-3 data-popup-open:ring-ring/20"
                       >
-                        <span className="truncate">{language.proficiency}</span>
+                        <span className="truncate">
+                          {t(language.proficiency)}
+                        </span>
                         <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-popup-open:rotate-180" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
@@ -1221,7 +1254,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                               value={proficiency}
                               className="min-h-10 rounded-xl px-3.5 py-2.5 font-normal transition-colors focus:bg-muted focus:text-foreground focus:**:text-foreground data-checked:bg-primary/10 data-checked:font-medium data-checked:text-primary"
                             >
-                              {proficiency}
+                              {t(proficiency)}
                             </DropdownMenuRadioItem>
                           ))}
                         </DropdownMenuRadioGroup>
@@ -1231,7 +1264,9 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={`Remove ${language.language || "language"}`}
+                    aria-label={t("Remove {{language}}", {
+                      language: language.language || t("language"),
+                    })}
                     onClick={() =>
                       updateContent({
                         languages: content.languages.filter(
@@ -1250,7 +1285,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
 
         <aside className="min-w-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
           <p className="mb-3 text-sm font-medium text-muted-foreground">
-            Live preview
+            {t("Live preview")}
           </p>
           <div className="preview-scroll flex min-h-[calc(100dvh-9.75rem)] justify-center overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 lg:min-h-0 lg:flex-1 dark:bg-slate-900">
             <CvPreview content={content} />

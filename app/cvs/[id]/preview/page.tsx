@@ -3,16 +3,21 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 
 import { CvPreview } from "@/components/cv-preview"
+import { LanguageToggle } from "@/components/language-toggle"
 import { PrintButton } from "@/components/print-button"
 import { buttonVariants } from "@/components/ui/button"
 import { getSessionUser } from "@/lib/auth"
 import { getCv, getStudentCv } from "@/lib/cvs"
+import { translate } from "@/lib/i18n"
+import { getLocale } from "@/lib/locale"
 
 export default async function PreviewCvPage(
   props: PageProps<"/cvs/[id]/preview">
 ) {
   const user = await getSessionUser()
   if (!user) redirect("/login")
+  const locale = await getLocale()
+  const t = (message: string) => translate(locale, message)
 
   const { id } = await props.params
   const cv =
@@ -27,9 +32,14 @@ export default async function PreviewCvPage(
           className={buttonVariants({ variant: "outline" })}
         >
           <ArrowLeft data-icon="inline-start" />
-          {user.role === "lecturer" ? "Back to dashboard" : "Back to editor"}
+          {t(
+            user.role === "lecturer" ? "Back to dashboard" : "Back to editor"
+          )}
         </Link>
-        <PrintButton />
+        <div className="flex items-center gap-2">
+          <LanguageToggle />
+          <PrintButton />
+        </div>
       </div>
       <CvPreview content={cv.content} className="mx-auto" />
     </main>
