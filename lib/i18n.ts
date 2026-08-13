@@ -174,6 +174,28 @@ const idMessages: Record<string, string> = {
   "The page you are looking for does not exist or may have moved.":
     "Halaman yang Anda cari tidak tersedia atau mungkin telah dipindahkan.",
   "Return to dashboard": "Kembali ke dasbor",
+  "Auto-saving": "Menyimpan otomatis",
+  "All changes saved": "Semua perubahan tersimpan",
+  "Save failed": "Gagal menyimpan",
+  "Custom Sections": "Bagian Kustom",
+  "Add custom section": "Tambah bagian kustom",
+  "Section title": "Judul bagian",
+  "New section": "Bagian baru",
+  "Add item": "Tambah item",
+  "New item": "Item baru",
+  "Subtitle": "Sub judul",
+  "Description": "Deskripsi",
+  "Drag to reorder": "Seret untuk mengurutkan ulang",
+  "Move up": "Pindah ke atas",
+  "Move down": "Pindah ke bawah",
+  "Page {{page}} of {{total}}": "Halaman {{page}} dari {{total}}",
+  "Template": "Templat",
+  "Modern": "Modern",
+  "Minimal": "Minimal",
+  "Classic": "Klasik",
+  "Edit form": "Edit formulir",
+  "Remove section": "Hapus bagian",
+  "Remove {{section}}": "Hapus {{section}}",
 }
 
 export function isLocale(value: string | undefined): value is Locale {

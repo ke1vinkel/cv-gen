@@ -18,17 +18,20 @@ import {
   List,
   ListIcon,
   LoaderCircle,
+  Pencil,
   Plus,
   Save,
   Sparkles,
   Trash2,
   Underline,
   UserRound,
+  LayoutGrid,
 } from "lucide-react"
 import Link from "next/link"
 import {
   cloneElement,
   isValidElement,
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -52,16 +55,25 @@ import { Textarea } from "@/components/ui/textarea"
 import type {
   CvContent,
   CvRecord,
+  CustomSection,
+  CustomSectionItem,
   Education,
   Experience,
   Language,
 } from "@/lib/cv-schema"
+import { defaultSectionOrder } from "@/lib/cv-schema"
 import type { Translator } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
 type SectionKey =
-  "personal" | "summary" | "experience" | "education" | "skills" | "languages"
+  | "personal"
+  | "summary"
+  | "experience"
+  | "education"
+  | "skills"
+  | "languages"
+type MobileView = "edit" | "preview"
 
 const languageProficiencies: Language["proficiency"][] = [
   "Not Rated",
@@ -71,6 +83,61 @@ const languageProficiencies: Language["proficiency"][] = [
   "Full Professional",
   "Native or Bilingual",
 ]
+
+const BUILT_IN_SECTIONS = new Set([
+  "personal",
+  "summary",
+  "experience",
+  "education",
+  "skills",
+  "languages",
+])
+
+// ─── Resizable Split ──────────────────────────────────────────────
+
+function ResizeHandle({
+  onResize,
+}: {
+  onResize: (delta: number) => void
+}) {
+  const handleRef = useRef<HTMLDivElement>(null)
+
+  function handlePointerDown(event: React.PointerEvent) {
+    event.preventDefault()
+    const startX = event.clientX
+    const pointerId = event.pointerId
+    const target = event.currentTarget as HTMLElement
+    target.setPointerCapture(pointerId)
+
+    function onPointerMove(moveEvent: PointerEvent) {
+      onResize(moveEvent.clientX - startX)
+    }
+
+    function onPointerUp() {
+      target.releasePointerCapture(pointerId)
+      target.removeEventListener("pointermove", onPointerMove)
+      target.removeEventListener("pointerup", onPointerUp)
+    }
+
+    target.addEventListener("pointermove", onPointerMove)
+    target.addEventListener("pointerup", onPointerUp)
+  }
+
+  return (
+    <div
+      ref={handleRef}
+      onPointerDown={handlePointerDown}
+      className="hidden lg:flex w-2 cursor-col-resize items-center justify-center hover:bg-primary/10 active:bg-primary/20 transition-colors select-none touch-none"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panels"
+    >
+      <div className="h-8 w-0.5 rounded-full bg-border" />
+    </div>
+  )
+}
+
+// ─── Formatting Textarea ───────────────────────────────────────────
 
 function FormattingTextarea({
   value,
@@ -135,6 +202,25 @@ function FormattingTextarea({
     const textarea = event.currentTarget
     const lineStart = value.lastIndexOf("\n", textarea.selectionStart - 1) + 1
     const beforeCaret = value.slice(lineStart, textarea.selectionStart)
+
+    // Keyboard shortcuts: Ctrl/Cmd + B/I/U
+    if (event.ctrlKey || event.metaKey) {
+      if (event.key === "b") {
+        event.preventDefault()
+        replaceSelection("**")
+        return
+      }
+      if (event.key === "i") {
+        event.preventDefault()
+        replaceSelection("*")
+        return
+      }
+      if (event.key === "u") {
+        event.preventDefault()
+        replaceSelection("__")
+        return
+      }
+    }
 
     if (event.key === "Enter" && beforeCaret.startsWith("• ")) {
       event.preventDefault()
@@ -254,6 +340,8 @@ function FormattingTextarea({
     </div>
   )
 }
+
+// ─── Form helpers ──────────────────────────────────────────────────
 
 function FormField({
   label,
@@ -383,6 +471,204 @@ function EditorSection({
   )
 }
 
+// ─── Custom Section Editor ─────────────────────────────────────────
+
+function CustomSectionEditor({
+  section,
+  onUpdate,
+  onDelete,
+}: {
+  section: CustomSection
+  onUpdate: (patch: Partial<CustomSection>) => void
+  onDelete: () => void
+}) {
+  const { t } = useLanguage()
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  function updateItem(
+    itemId: string,
+    patch: Partial<CustomSectionItem>
+  ) {
+    onUpdate({
+      items: section.items.map((item) =>
+        item.id === itemId ? { ...item, ...patch } : item
+      ),
+    })
+  }
+
+  function addItem() {
+    onUpdate({
+      items: [
+        ...section.items,
+        {
+          id: crypto.randomUUID(),
+          title: t("New item"),
+          subtitle: "",
+          description: "",
+          bullets: [],
+        },
+      ],
+    })
+  }
+
+  function removeItem(itemId: string) {
+    onUpdate({
+      items: section.items.filter((item) => item.id !== itemId),
+    })
+  }
+
+  if (!isExpanded) {
+    return (
+      <section className="border-b last:border-b-0">
+        <div className="flex min-h-19 items-center gap-3 py-4">
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="flex min-w-0 flex-1 items-center gap-4 rounded-lg text-left transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center text-foreground">
+              <LayoutGrid className="size-5" />
+            </span>
+            <span className="min-w-0 flex-1 text-lg font-medium tracking-tight">
+              {section.title}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({section.items.length})
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label={t("Remove {{section}}", {
+              section: section.title,
+            })}
+          >
+            <Trash2 className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label={t("Edit {{title}}", { title: section.title })}
+          >
+            <ChevronRight className="size-5" />
+          </button>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="ui-section-enter mx-auto w-full max-w-2xl px-1 py-5 sm:px-5 sm:py-7">
+      <header className="mb-8 flex items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => setIsExpanded(false)}
+          aria-label={t("Back to sections")}
+        >
+          <ArrowLeft />
+        </Button>
+        <Input
+          value={section.title}
+          onChange={(event) => {
+            onUpdate({ title: event.target.value })
+          }}
+          className="min-w-0 flex-1 text-2xl font-semibold tracking-tight bg-transparent border-none"
+          aria-label={t("Section title")}
+          maxLength={100}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onDelete}
+          aria-label={t("Remove section")}
+        >
+          <Trash2 />
+        </Button>
+      </header>
+
+      <div className="mb-5">
+        <Button
+          variant="outline"
+          className="h-12 w-full rounded-xl border-dashed bg-transparent text-base"
+          onClick={addItem}
+        >
+          <Plus data-icon="inline-start" /> {t("Add item")}
+        </Button>
+      </div>
+
+      <div className="space-y-8">
+        {section.items.map((item) => (
+          <div
+            key={item.id}
+            className="space-y-5 border-b pb-8 last:border-b-0 last:pb-0"
+          >
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-destructive"
+                aria-label={t("Remove {{item}}", { item: item.title })}
+                onClick={() => removeItem(item.id)}
+              >
+                {t("Delete")} <Trash2 data-icon="inline-end" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <FormField label="Title">
+                <Input
+                  className="h-12 rounded-xl px-4"
+                  value={item.title}
+                  onChange={(event) =>
+                    updateItem(item.id, { title: event.target.value })
+                  }
+                />
+              </FormField>
+              <FormField label="Subtitle">
+                <Input
+                  className="h-12 rounded-xl px-4"
+                  value={item.subtitle ?? ""}
+                  placeholder={t("Subtitle")}
+                  onChange={(event) =>
+                    updateItem(item.id, { subtitle: event.target.value })
+                  }
+                />
+              </FormField>
+              <FormField label="URL">
+                <Input
+                  className="h-12 rounded-xl px-4"
+                  type="url"
+                  value={item.url ?? ""}
+                  placeholder="https://..."
+                  onChange={(event) =>
+                    updateItem(item.id, { url: event.target.value })
+                  }
+                />
+              </FormField>
+              <FormField label="Description">
+                <FormattingTextarea
+                  value={item.description ?? ""}
+                  placeholder={t("Description")}
+                  rows={4}
+                  onChange={(description) =>
+                    updateItem(item.id, { description })
+                  }
+                />
+              </FormField>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// ─── Date helpers ──────────────────────────────────────────────────
+
 function formatMonthYear(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 6)
   if (!digits) return ""
@@ -452,6 +738,8 @@ function DateField({
   )
 }
 
+// ─── Blank templates ───────────────────────────────────────────────
+
 function blankExperience(t: Translator): Experience {
   return {
     id: crypto.randomUUID(),
@@ -486,6 +774,131 @@ function blankLanguage(language = ""): Language {
   }
 }
 
+// ─── Auto-Save Hook ────────────────────────────────────────────────
+
+const AUTO_SAVE_DELAY = 1500
+
+function useAutoSave(
+  initialCvId: string,
+  getPayload: () => { title: string; content: CvContent },
+  onSaveStateChange: (state: SaveState, message?: string) => void
+) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const revisionRef = useRef(0)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+
+    return () => {
+      isMountedRef.current = false
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [])
+
+  const scheduleAutoSave = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    revisionRef.current += 1
+    const capturedRevision = revisionRef.current
+
+    timerRef.current = setTimeout(async () => {
+      if (!isMountedRef.current) return
+      onSaveStateChange("saving")
+
+      try {
+        const payload = getPayload()
+        const response = await fetch(`/api/cvs/${initialCvId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string
+        }
+
+        if (!isMountedRef.current) return
+
+        if (!response.ok) {
+          onSaveStateChange("error", data.error ?? "Could not save your changes.")
+          return
+        }
+
+        if (capturedRevision === revisionRef.current) {
+          onSaveStateChange("saved")
+        } else {
+          onSaveStateChange("idle")
+        }
+      } catch {
+        if (!isMountedRef.current) return
+        onSaveStateChange(
+          "error",
+          "Could not connect to the server. Try saving again."
+        )
+      }
+    }, AUTO_SAVE_DELAY)
+  }, [initialCvId, getPayload, onSaveStateChange])
+
+  const flushNow = useCallback(async () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+
+    onSaveStateChange("saving")
+    try {
+      const payload = getPayload()
+      const response = await fetch(`/api/cvs/${initialCvId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string
+      }
+
+      if (!response.ok) {
+        onSaveStateChange("error", data.error ?? "Could not save your changes.")
+        return false
+      }
+      onSaveStateChange("saved")
+      return true
+    } catch {
+      onSaveStateChange(
+        "error",
+        "Could not connect to the server. Try saving again."
+      )
+      return false
+    }
+  }, [initialCvId, getPayload, onSaveStateChange])
+
+  const cancel = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }, [])
+
+  return { scheduleAutoSave, flushNow, cancel }
+}
+
+// ─── Section Icon Map ──────────────────────────────────────────────
+
+const sectionIcons: Record<string, React.ReactNode> = {
+  personal: <UserRound className="size-5" />,
+  summary: <List className="size-5" />,
+  experience: <BriefcaseBusiness className="size-5" />,
+  education: <GraduationCap className="size-5" />,
+  skills: <Sparkles className="size-5" />,
+  languages: <Languages className="size-5" />,
+}
+
+
+
+// ─── Main Editor ──────────────────────────────────────────────────
+
 export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
   const { t } = useLanguage()
   const [title, setTitle] = useState(initialCv.title)
@@ -513,6 +926,58 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
   const editRevision = useRef(0)
   const isDirtyRef = useRef(false)
   const hasHistoryGuard = useRef(false)
+  const [mobileView, setMobileView] = useState<MobileView>("edit")
+  const [splitPercent, setSplitPercent] = useState(36)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Content & title refs for auto-save closure
+  const contentRef = useRef(content)
+  const titleRef = useRef(title)
+
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
+
+  useEffect(() => {
+    titleRef.current = title
+  }, [title])
+
+  const getPayload = useCallback(
+    () => ({
+      title: titleRef.current,
+      content: contentRef.current,
+    }),
+    []
+  )
+
+  const handleSaveStateChange = useCallback(
+    (state: SaveState, msg?: string) => {
+      setSaveState(state)
+      if (msg) setMessage(t(msg))
+      if (state === "saved") {
+        isDirtyRef.current = false
+        setIsDirty(false)
+        setMessage("")
+        if (
+          hasHistoryGuard.current &&
+          window.history.state?.cvEditorUnsavedGuard
+        ) {
+          hasHistoryGuard.current = false
+          window.history.back()
+        }
+      }
+    },
+    [t]
+  )
+
+  const { scheduleAutoSave, flushNow, cancel: cancelAutoSave } = useAutoSave(
+    initialCv.id,
+    getPayload,
+    handleSaveStateChange
+  )
+
+  // Ensure sectionOrder exists (backward compatibility)
+  const sectionOrder = content.sectionOrder ?? [...defaultSectionOrder]
 
   useEffect(() => {
     function warnBeforeUnload(event: BeforeUnloadEvent) {
@@ -535,8 +1000,9 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
     return () => {
       window.removeEventListener("beforeunload", warnBeforeUnload)
       window.removeEventListener("popstate", blockBackNavigation)
+      cancelAutoSave()
     }
-  }, [t])
+  }, [t, cancelAutoSave])
 
   function markDirty() {
     editRevision.current += 1
@@ -553,6 +1019,9 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
       )
       hasHistoryGuard.current = true
     }
+
+    // Trigger auto-save
+    scheduleAutoSave()
   }
 
   function updateContent(patch: Partial<CvContent>) {
@@ -602,50 +1071,683 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
     })
   }
 
+  function updateCustomSection(
+    sectionId: string,
+    patch: Partial<CustomSection>
+  ) {
+    updateContent({
+      customSections: (content.customSections ?? []).map((section) =>
+        section.id === sectionId ? { ...section, ...patch } : section
+      ),
+    })
+  }
+
+  function addCustomSection() {
+    const newSection: CustomSection = {
+      id: crypto.randomUUID(),
+      title: t("New section"),
+      items: [],
+    }
+    const newOrder = [...sectionOrder, newSection.id]
+    updateContent({
+      customSections: [...(content.customSections ?? []), newSection],
+      sectionOrder: newOrder,
+    })
+  }
+
+  function removeCustomSection(sectionId: string) {
+    updateContent({
+      customSections: (content.customSections ?? []).filter(
+        (section) => section.id !== sectionId
+      ),
+      sectionOrder: sectionOrder.filter((id) => id !== sectionId),
+    })
+  }
+
   async function save() {
-    const savedRevision = editRevision.current
-    setSaveState("saving")
-    setMessage("")
-
-    try {
-      const response = await fetch(`/api/cvs/${initialCv.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content }),
-      })
-      const data = (await response.json().catch(() => ({}))) as {
-        error?: string
-      }
-
-      if (!response.ok) {
-        setSaveState("error")
-        setMessage(t(data.error ?? "Could not save your changes."))
-        return
-      }
-
-      if (savedRevision === editRevision.current) {
-        isDirtyRef.current = false
-        setIsDirty(false)
-        setSaveState("saved")
-
-        if (
-          hasHistoryGuard.current &&
-          window.history.state?.cvEditorUnsavedGuard
-        ) {
-          hasHistoryGuard.current = false
-          window.history.back()
-        }
-      } else {
-        setSaveState("idle")
-      }
-    } catch {
-      setSaveState("error")
-      setMessage(t("Could not connect to the server. Try saving again."))
+    const saved = await flushNow()
+    if (saved) {
+      isDirtyRef.current = false
+      setIsDirty(false)
     }
   }
 
+
+
+  // Build ordered section list for rendering
+  function renderSections() {
+    return sectionOrder.map((sectionId, orderIndex) => {
+      if (BUILT_IN_SECTIONS.has(sectionId)) {
+        const key = sectionId as SectionKey
+
+        switch (key) {
+          case "personal":
+            return (
+              <EditorSection
+                key={key}
+                section="personal"
+                title="Personal details"
+                icon={sectionIcons.personal}
+                activeSection={activeSection}
+                visible={sectionIsVisible("personal")}
+                orderClass={`order-[${orderIndex}]`}
+                onOpen={() => setActiveSection("personal")}
+                onBack={() => setActiveSection(null)}
+                onToggleVisibility={() => toggleSectionVisibility("personal")}
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Full name" className="sm:col-span-2">
+                    <Input
+                      value={content.name}
+                      onChange={(event) =>
+                        updateContent({ name: event.target.value })
+                      }
+                      maxLength={200}
+                    />
+                  </FormField>
+                  <FormField label="Email">
+                    <Input
+                      type="email"
+                      value={content.contact.email}
+                      onChange={(event) =>
+                        updateContent({
+                          contact: {
+                            ...content.contact,
+                            email: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </FormField>
+                  <FormField label="Phone">
+                    <Input
+                      value={content.contact.phone}
+                      onChange={(event) =>
+                        updateContent({
+                          contact: {
+                            ...content.contact,
+                            phone: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </FormField>
+                  <FormField label="Website">
+                    <Input
+                      value={content.contact.website}
+                      placeholder="github.com/username"
+                      onChange={(event) =>
+                        updateContent({
+                          contact: {
+                            ...content.contact,
+                            website: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </FormField>
+                  <FormField label="Location">
+                    <Input
+                      autoComplete="off"
+                      value={content.contact.location}
+                      placeholder="Jakarta, Indonesia"
+                      onChange={(event) =>
+                        updateContent({
+                          contact: {
+                            ...content.contact,
+                            location: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </FormField>
+                </div>
+              </EditorSection>
+            )
+          case "summary":
+            return (
+              <EditorSection
+                key={key}
+                section="summary"
+                title="Summary"
+                icon={sectionIcons.summary}
+                activeSection={activeSection}
+                visible={sectionIsVisible("summary")}
+                orderClass={`order-[${orderIndex}]`}
+                onOpen={() => setActiveSection("summary")}
+                onBack={() => setActiveSection(null)}
+                onToggleVisibility={() => toggleSectionVisibility("summary")}
+              >
+                <div>
+                  <Textarea
+                    aria-label={t("Summary")}
+                    value={content.summary}
+                    onChange={(event) =>
+                      updateContent({ summary: event.target.value })
+                    }
+                    placeholder={t(
+                      "Write a concise profile focused on the role you want."
+                    )}
+                    rows={5}
+                    maxLength={2000}
+                  />
+                </div>
+              </EditorSection>
+            )
+          case "experience":
+            return (
+              <EditorSection
+                key={key}
+                section="experience"
+                title="Experience"
+                icon={sectionIcons.experience}
+                activeSection={activeSection}
+                visible={sectionIsVisible("experience")}
+                orderClass={`order-[${orderIndex}]`}
+                onOpen={() => setActiveSection("experience")}
+                onBack={() => setActiveSection(null)}
+                onToggleVisibility={() =>
+                  toggleSectionVisibility("experience")
+                }
+              >
+                <div className="mb-7">
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full rounded-xl border-dashed bg-transparent text-base hover:border-foreground/30"
+                    onClick={() =>
+                      updateContent({
+                        experiences: [
+                          ...content.experiences,
+                          blankExperience(t),
+                        ],
+                      })
+                    }
+                  >
+                    <Plus data-icon="inline-start" /> {t("Add Experience")}
+                  </Button>
+                </div>
+                <div className="space-y-8">
+                  {content.experiences.length === 0 && (
+                    <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+                      {t(
+                        "Add internships, employment, freelance work, or substantial projects."
+                      )}
+                    </p>
+                  )}
+                  {content.experiences.map((experience) => (
+                    <div
+                      key={experience.id}
+                      className="space-y-5 border-b pb-8 last:border-b-0 last:pb-0"
+                    >
+                      <div className="flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label={t("Remove {{item}}", {
+                            item: experience.role,
+                          })}
+                          onClick={() =>
+                            updateContent({
+                              experiences: content.experiences.filter(
+                                (item) => item.id !== experience.id
+                              ),
+                            })
+                          }
+                        >
+                          {t("Delete")} <Trash2 data-icon="inline-end" />
+                        </Button>
+                      </div>
+                      <div className="space-y-5">
+                        <FormField label="Job title">
+                          <Input
+                            className="h-12 rounded-xl px-4"
+                            value={experience.role}
+                            onChange={(event) =>
+                              updateExperience(experience.id, {
+                                role: event.target.value,
+                              })
+                            }
+                          />
+                        </FormField>
+                        <FormField label="Company or project name">
+                          <Input
+                            className="h-12 rounded-xl px-4"
+                            value={experience.organization}
+                            onChange={(event) =>
+                              updateExperience(experience.id, {
+                                organization: event.target.value,
+                              })
+                            }
+                          />
+                        </FormField>
+                        <FormField label="Company or project link">
+                          <Input
+                            className="h-12 rounded-xl px-4"
+                            type="url"
+                            value={experience.url ?? ""}
+                            placeholder="https://company.com"
+                            onChange={(event) =>
+                              updateExperience(experience.id, {
+                                url: event.target.value,
+                              })
+                            }
+                          />
+                        </FormField>
+                        <div className="grid gap-5 sm:grid-cols-2">
+                          <DateField
+                            label="Start date"
+                            value={experience.startDate}
+                            onChange={(startDate) =>
+                              updateExperience(experience.id, { startDate })
+                            }
+                          />
+                          <DateField
+                            label="End date"
+                            value={experience.endDate}
+                            allowPresent
+                            onChange={(endDate) =>
+                              updateExperience(experience.id, { endDate })
+                            }
+                          />
+                        </div>
+                        <FormField label="Accomplishments">
+                          <FormattingTextarea
+                            value={
+                              highlightsText[experience.id] ??
+                              [
+                                experience.description,
+                                ...experience.bullets.map(
+                                  (bullet) => `• ${bullet}`
+                                ),
+                              ]
+                                .filter(Boolean)
+                                .join("\n")
+                            }
+                            placeholder={t("Describe your accomplishments")}
+                            rows={4}
+                            onChange={(value) => {
+                              setHighlightsText((current) => ({
+                                ...current,
+                                [experience.id]: value,
+                              }))
+                              const lines = value.split("\n")
+                              updateExperience(experience.id, {
+                                description: lines
+                                  .filter((line) => !line.startsWith("• "))
+                                  .join("\n")
+                                  .trim(),
+                                bullets: lines
+                                  .filter((line) => line.startsWith("• "))
+                                  .map((line) => line.slice(2).trim())
+                                  .filter(Boolean),
+                              })
+                            }}
+                          />
+                        </FormField>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </EditorSection>
+            )
+          case "education":
+            return (
+              <EditorSection
+                key={key}
+                section="education"
+                title="Education"
+                icon={sectionIcons.education}
+                activeSection={activeSection}
+                visible={sectionIsVisible("education")}
+                orderClass={`order-[${orderIndex}]`}
+                onOpen={() => setActiveSection("education")}
+                onBack={() => setActiveSection(null)}
+                onToggleVisibility={() =>
+                  toggleSectionVisibility("education")
+                }
+              >
+                <div className="mb-5">
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full rounded-xl border-dashed bg-transparent text-base font-medium"
+                    onClick={() =>
+                      updateContent({
+                        education: [
+                          ...content.education,
+                          blankEducation(t),
+                        ],
+                      })
+                    }
+                  >
+                    <Plus data-icon="inline-start" /> {t("Add education")}
+                  </Button>
+                </div>
+                <div className="space-y-4">
+                  {content.education.length === 0 && (
+                    <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+                      {t(
+                        "Add your university, school, certification, or other relevant study."
+                      )}
+                    </p>
+                  )}
+                  {content.education.map((education) => (
+                    <div
+                      key={education.id}
+                      className="space-y-5 border-b pb-8 last:border-b-0 last:pb-0"
+                    >
+                      <div className="flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label={t("Remove {{item}}", {
+                            item: education.degree,
+                          })}
+                          onClick={() =>
+                            updateContent({
+                              education: content.education.filter(
+                                (item) => item.id !== education.id
+                              ),
+                            })
+                          }
+                        >
+                          {t("Delete")} <Trash2 data-icon="inline-end" />
+                        </Button>
+                      </div>
+                      <div className="space-y-4">
+                        <label className="block">
+                          <span className="sr-only">
+                            {t("University/School")}
+                          </span>
+                          <Input
+                            className="h-12 rounded-xl px-4"
+                            value={education.institution}
+                            placeholder={t("University/School")}
+                            onChange={(event) =>
+                              updateEducation(education.id, {
+                                institution: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="sr-only">{t("Degree")}</span>
+                          <Input
+                            className="h-12 rounded-xl px-4"
+                            value={education.degree}
+                            placeholder={t(
+                              "Degree (e.g. Bachelor's degree, High school diploma)"
+                            )}
+                            onChange={(event) =>
+                              updateEducation(education.id, {
+                                degree: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="sr-only">
+                            {t("Field of Study")}
+                          </span>
+                          <Input
+                            className="h-12 rounded-xl px-4"
+                            value={education.fieldOfStudy ?? ""}
+                            placeholder={t("Field of Study")}
+                            onChange={(event) =>
+                              updateEducation(education.id, {
+                                fieldOfStudy: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="sr-only">
+                            {t("Relevant URL (Optional)")}
+                          </span>
+                          <Input
+                            className="h-12 rounded-xl px-4"
+                            type="url"
+                            value={education.url ?? ""}
+                            placeholder={t("Relevant URL (Optional)")}
+                            onChange={(event) =>
+                              updateEducation(education.id, {
+                                url: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <div className="grid gap-4 pt-1 sm:grid-cols-2">
+                          <DateField
+                            label="Start date"
+                            value={education.startDate}
+                            onChange={(startDate) =>
+                              updateEducation(education.id, { startDate })
+                            }
+                          />
+                          <DateField
+                            label="End date"
+                            value={education.endDate}
+                            allowPresent
+                            onChange={(endDate) =>
+                              updateEducation(education.id, { endDate })
+                            }
+                          />
+                        </div>
+                        <label className="block">
+                          <span className="sr-only">{t("Achievements")}</span>
+                          <FormattingTextarea
+                            value={education.details}
+                            placeholder={t("Achievements")}
+                            rows={6}
+                            onChange={(details) =>
+                              updateEducation(education.id, {
+                                details,
+                              })
+                            }
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </EditorSection>
+            )
+          case "skills":
+            return (
+              <EditorSection
+                key={key}
+                section="skills"
+                title="Skills"
+                icon={sectionIcons.skills}
+                activeSection={activeSection}
+                visible={sectionIsVisible("skills")}
+                orderClass={`order-[${orderIndex}]`}
+                onOpen={() => setActiveSection("skills")}
+                onBack={() => setActiveSection(null)}
+                onToggleVisibility={() => toggleSectionVisibility("skills")}
+              >
+                <div>
+                  <FormattingTextarea
+                    value={skillsText}
+                    placeholder={t(
+                      "Add skills, then use the list button for bullets"
+                    )}
+                    rows={6}
+                    onChange={(value) => {
+                      setSkillsText(value)
+                      updateContent({
+                        skills: value
+                          .split("\n")
+                          .map((item) => item.trim())
+                          .filter(Boolean),
+                      })
+                    }}
+                  />
+                </div>
+              </EditorSection>
+            )
+          case "languages":
+            return (
+              <EditorSection
+                key={key}
+                section="languages"
+                title="Languages"
+                icon={sectionIcons.languages}
+                activeSection={activeSection}
+                visible={sectionIsVisible("languages")}
+                orderClass={`order-[${orderIndex}]`}
+                onOpen={() => setActiveSection("languages")}
+                onBack={() => setActiveSection(null)}
+                onToggleVisibility={() =>
+                  toggleSectionVisibility("languages")
+                }
+              >
+                <div className="mb-7">
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full rounded-xl border-dashed bg-transparent text-base"
+                    onClick={() =>
+                      updateContent({
+                        languages: [
+                          ...content.languages,
+                          blankLanguage(),
+                        ],
+                      })
+                    }
+                  >
+                    <Plus data-icon="inline-start" /> {t("Add")}
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {content.languages.length === 0 && (
+                    <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+                      {t(
+                        "Add the languages you can use and your proficiency level."
+                      )}
+                    </p>
+                  )}
+                  {content.languages.map((language) => (
+                    <div
+                      key={language.id}
+                      className="grid gap-3 rounded-xl border bg-muted/20 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+                    >
+                      <FormField label="Language">
+                        <Input
+                          value={language.language}
+                          placeholder={t("Language")}
+                          maxLength={200}
+                          onChange={(event) =>
+                            updateLanguage(language.id, {
+                              language: event.target.value,
+                            })
+                          }
+                        />
+                      </FormField>
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor={`language-proficiency-${language.id}`}
+                        >
+                          {t("Proficiency")}
+                        </Label>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            id={`language-proficiency-${language.id}`}
+                            className="group flex h-10 w-full items-center justify-between rounded-xl border border-border/70 bg-background px-3.5 text-sm font-medium shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] outline-none hover:border-foreground/20 hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 data-popup-open:border-ring/70 data-popup-open:bg-muted/50 data-popup-open:ring-3 data-popup-open:ring-ring/20"
+                          >
+                            <span className="truncate">
+                              {t(language.proficiency)}
+                            </span>
+                            <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-popup-open:rotate-180" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="start"
+                            sideOffset={8}
+                            className="min-w-(--anchor-width) rounded-2xl border border-border/60 bg-popover/98 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.14)] ring-0 backdrop-blur-xl"
+                          >
+                            <DropdownMenuRadioGroup
+                              value={language.proficiency}
+                              onValueChange={(proficiency) =>
+                                updateLanguage(language.id, {
+                                  proficiency:
+                                    proficiency as Language["proficiency"],
+                                })
+                              }
+                            >
+                              {languageProficiencies.map((proficiency) => (
+                                <DropdownMenuRadioItem
+                                  key={proficiency}
+                                  value={proficiency}
+                                  className="min-h-10 rounded-xl px-3.5 py-2.5 font-normal transition-colors focus:bg-muted focus:text-foreground focus:**:text-foreground data-checked:bg-primary/10 data-checked:font-medium data-checked:text-primary"
+                                >
+                                  {t(proficiency)}
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("Remove {{language}}", {
+                          language: language.language || t("language"),
+                        })}
+                        onClick={() =>
+                          updateContent({
+                            languages: content.languages.filter(
+                              (item) => item.id !== language.id
+                            ),
+                          })
+                        }
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </EditorSection>
+            )
+          default:
+            return null
+        }
+      }
+
+      // Custom sections
+      const customSection = (content.customSections ?? []).find(
+        (s) => s.id === sectionId
+      )
+      if (!customSection) return null
+
+      // Don't render custom sections when a built-in section is active
+      if (activeSection) return null
+
+      return (
+        <CustomSectionEditor
+          key={customSection.id}
+          section={customSection}
+          onUpdate={(patch) => updateCustomSection(customSection.id, patch)}
+          onDelete={() => removeCustomSection(customSection.id)}
+        />
+      )
+    })
+  }
+
+  const saveStatusText =
+    saveState === "saved"
+      ? t("All changes saved")
+      : saveState === "saving"
+        ? t("Auto-saving")
+        : saveState === "error"
+          ? message || t("Save failed")
+          : isDirty
+            ? message || t("Unsaved changes")
+            : t("All changes saved")
+
   return (
     <div className="min-h-[100dvh] bg-muted/40">
+      {/* ─── Top Header Bar ─── */}
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 print:hidden">
         <div className="flex min-h-16 w-full flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -684,17 +1786,13 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 "hidden text-xs sm:inline",
                 saveState === "error"
                   ? "text-destructive"
-                  : "text-muted-foreground"
+                  : saveState === "saving"
+                    ? "text-muted-foreground animate-pulse"
+                    : "text-muted-foreground"
               )}
               role="status"
             >
-              {saveState === "saved"
-                ? t("Saved")
-                : saveState === "error"
-                  ? message
-                  : isDirty
-                    ? message || t("Unsaved changes")
-                    : t("Changes are saved manually")}
+              {saveStatusText}
             </span>
             <LanguageToggle />
             <Link
@@ -708,6 +1806,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               }}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
+                "hidden lg:inline-flex",
                 isDirty && "cursor-not-allowed opacity-60"
               )}
             >
@@ -731,567 +1830,98 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
         </div>
       </div>
 
-      <main className="grid w-full gap-4 p-4 sm:gap-6 sm:p-6 lg:h-[calc(100dvh-4rem)] lg:grid-cols-[minmax(360px,36%)_minmax(0,1fr)] lg:items-stretch lg:overflow-hidden">
-        <div className="editor-scroll flex flex-col self-start overflow-hidden rounded-2xl border bg-background px-5 shadow-[0_12px_40px_rgba(15,23,42,0.05)] sm:px-7 lg:h-full lg:self-stretch lg:overflow-y-auto">
-          <EditorSection
-            section="personal"
-            title="Personal details"
-            icon={<UserRound className="size-5" />}
-            activeSection={activeSection}
-            visible={sectionIsVisible("personal")}
-            orderClass="order-1"
-            onOpen={() => setActiveSection("personal")}
-            onBack={() => setActiveSection(null)}
-            onToggleVisibility={() => toggleSectionVisibility("personal")}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Full name" className="sm:col-span-2">
-                <Input
-                  value={content.name}
-                  onChange={(event) =>
-                    updateContent({ name: event.target.value })
-                  }
-                  maxLength={200}
-                />
-              </FormField>
-              <FormField label="Email">
-                <Input
-                  type="email"
-                  value={content.contact.email}
-                  onChange={(event) =>
-                    updateContent({
-                      contact: {
-                        ...content.contact,
-                        email: event.target.value,
-                      },
-                    })
-                  }
-                />
-              </FormField>
-              <FormField label="Phone">
-                <Input
-                  value={content.contact.phone}
-                  onChange={(event) =>
-                    updateContent({
-                      contact: {
-                        ...content.contact,
-                        phone: event.target.value,
-                      },
-                    })
-                  }
-                />
-              </FormField>
-              <FormField label="Website">
-                <Input
-                  value={content.contact.website}
-                  placeholder="github.com/username"
-                  onChange={(event) =>
-                    updateContent({
-                      contact: {
-                        ...content.contact,
-                        website: event.target.value,
-                      },
-                    })
-                  }
-                />
-              </FormField>
-              <FormField label="Location">
-                <Input
-                  autoComplete="off"
-                  value={content.contact.location}
-                  placeholder="Jakarta, Indonesia"
-                  onChange={(event) =>
-                    updateContent({
-                      contact: {
-                        ...content.contact,
-                        location: event.target.value,
-                      },
-                    })
-                  }
-                />
-              </FormField>
-            </div>
-          </EditorSection>
+      {/* ─── Main Content Area ─── */}
+      <main
+        ref={containerRef}
+        className="grid w-full gap-4 p-4 sm:gap-6 sm:p-6 lg:h-[calc(100dvh-4rem)] lg:grid-cols-[var(--editor-width)_auto_minmax(0,1fr)] lg:items-stretch lg:overflow-hidden"
+        style={
+          {
+            "--editor-width": `${splitPercent}%`,
+          } as React.CSSProperties
+        }
+      >
+        {/* ─── Editor Pane ─── */}
+        <div
+          className={cn(
+            "editor-scroll flex flex-col self-start overflow-hidden rounded-2xl border bg-background px-5 shadow-[0_12px_40px_rgba(15,23,42,0.05)] sm:px-7 lg:h-full lg:self-stretch lg:overflow-y-auto",
+            mobileView === "preview" && "hidden lg:flex"
+          )}
+        >
+          {renderSections()}
 
-          <EditorSection
-            section="summary"
-            title="Summary"
-            icon={<List className="size-5" />}
-            activeSection={activeSection}
-            visible={sectionIsVisible("summary")}
-            orderClass="order-2"
-            onOpen={() => setActiveSection("summary")}
-            onBack={() => setActiveSection(null)}
-            onToggleVisibility={() => toggleSectionVisibility("summary")}
-          >
-            <div>
-              <Textarea
-                aria-label={t("Summary")}
-                value={content.summary}
-                onChange={(event) =>
-                  updateContent({ summary: event.target.value })
-                }
-                placeholder={t(
-                  "Write a concise profile focused on the role you want."
-                )}
-                rows={5}
-                maxLength={2000}
-              />
-            </div>
-          </EditorSection>
-
-          <EditorSection
-            section="experience"
-            title="Experience"
-            icon={<BriefcaseBusiness className="size-5" />}
-            activeSection={activeSection}
-            visible={sectionIsVisible("experience")}
-            orderClass="order-3"
-            onOpen={() => setActiveSection("experience")}
-            onBack={() => setActiveSection(null)}
-            onToggleVisibility={() => toggleSectionVisibility("experience")}
-          >
-            <div className="mb-7">
+          {/* Add Custom Section button (only when no section is open) */}
+          {!activeSection && (
+            <div className="border-t py-4">
               <Button
                 variant="outline"
                 className="h-12 w-full rounded-xl border-dashed bg-transparent text-base hover:border-foreground/30"
-                onClick={() =>
-                  updateContent({
-                    experiences: [...content.experiences, blankExperience(t)],
-                  })
-                }
+                onClick={addCustomSection}
               >
-                <Plus data-icon="inline-start" /> {t("Add Experience")}
+                <Plus data-icon="inline-start" /> {t("Add custom section")}
               </Button>
             </div>
-            <div className="space-y-8">
-              {content.experiences.length === 0 && (
-                <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                  {t(
-                    "Add internships, employment, freelance work, or substantial projects."
-                  )}
-                </p>
-              )}
-              {content.experiences.map((experience) => (
-                <div
-                  key={experience.id}
-                  className="space-y-5 border-b pb-8 last:border-b-0 last:pb-0"
-                >
-                  <div className="flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label={t("Remove {{item}}", {
-                        item: experience.role,
-                      })}
-                      onClick={() =>
-                        updateContent({
-                          experiences: content.experiences.filter(
-                            (item) => item.id !== experience.id
-                          ),
-                        })
-                      }
-                    >
-                      {t("Delete")} <Trash2 data-icon="inline-end" />
-                    </Button>
-                  </div>
-                  <div className="space-y-5">
-                    <FormField label="Job title">
-                      <Input
-                        className="h-12 rounded-xl px-4"
-                        value={experience.role}
-                        onChange={(event) =>
-                          updateExperience(experience.id, {
-                            role: event.target.value,
-                          })
-                        }
-                      />
-                    </FormField>
-                    <FormField label="Company or project name">
-                      <Input
-                        className="h-12 rounded-xl px-4"
-                        value={experience.organization}
-                        onChange={(event) =>
-                          updateExperience(experience.id, {
-                            organization: event.target.value,
-                          })
-                        }
-                      />
-                    </FormField>
-                    <FormField label="Company or project link">
-                      <Input
-                        className="h-12 rounded-xl px-4"
-                        type="url"
-                        value={experience.url ?? ""}
-                        placeholder="https://company.com"
-                        onChange={(event) =>
-                          updateExperience(experience.id, {
-                            url: event.target.value,
-                          })
-                        }
-                      />
-                    </FormField>
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <DateField
-                        label="Start date"
-                        value={experience.startDate}
-                        onChange={(startDate) =>
-                          updateExperience(experience.id, { startDate })
-                        }
-                      />
-                      <DateField
-                        label="End date"
-                        value={experience.endDate}
-                        allowPresent
-                        onChange={(endDate) =>
-                          updateExperience(experience.id, { endDate })
-                        }
-                      />
-                    </div>
-                    <FormField label="Accomplishments">
-                      <FormattingTextarea
-                        value={
-                          highlightsText[experience.id] ??
-                          [
-                            experience.description,
-                            ...experience.bullets.map(
-                              (bullet) => `• ${bullet}`
-                            ),
-                          ]
-                            .filter(Boolean)
-                            .join("\n")
-                        }
-                        placeholder={t("Describe your accomplishments")}
-                        rows={4}
-                        onChange={(value) => {
-                          setHighlightsText((current) => ({
-                            ...current,
-                            [experience.id]: value,
-                          }))
-                          const lines = value.split("\n")
-                          updateExperience(experience.id, {
-                            description: lines
-                              .filter((line) => !line.startsWith("• "))
-                              .join("\n")
-                              .trim(),
-                            bullets: lines
-                              .filter((line) => line.startsWith("• "))
-                              .map((line) => line.slice(2).trim())
-                              .filter(Boolean),
-                          })
-                        }}
-                      />
-                    </FormField>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </EditorSection>
-
-          <EditorSection
-            section="education"
-            title="Education"
-            icon={<GraduationCap className="size-5" />}
-            activeSection={activeSection}
-            visible={sectionIsVisible("education")}
-            orderClass="order-4"
-            onOpen={() => setActiveSection("education")}
-            onBack={() => setActiveSection(null)}
-            onToggleVisibility={() => toggleSectionVisibility("education")}
-          >
-            <div className="mb-5">
-              <Button
-                variant="outline"
-                className="h-12 w-full rounded-xl border-dashed bg-transparent text-base font-medium"
-                onClick={() =>
-                  updateContent({
-                    education: [...content.education, blankEducation(t)],
-                  })
-                }
-              >
-                <Plus data-icon="inline-start" /> {t("Add education")}
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {content.education.length === 0 && (
-                <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                  {t(
-                    "Add your university, school, certification, or other relevant study."
-                  )}
-                </p>
-              )}
-              {content.education.map((education) => (
-                <div
-                  key={education.id}
-                  className="space-y-5 border-b pb-8 last:border-b-0 last:pb-0"
-                >
-                  <div className="flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label={t("Remove {{item}}", {
-                        item: education.degree,
-                      })}
-                      onClick={() =>
-                        updateContent({
-                          education: content.education.filter(
-                            (item) => item.id !== education.id
-                          ),
-                        })
-                      }
-                    >
-                      {t("Delete")} <Trash2 data-icon="inline-end" />
-                    </Button>
-                  </div>
-                  <div className="space-y-4">
-                    <label className="block">
-                      <span className="sr-only">{t("University/School")}</span>
-                      <Input
-                        className="h-12 rounded-xl px-4"
-                        value={education.institution}
-                        placeholder={t("University/School")}
-                        onChange={(event) =>
-                          updateEducation(education.id, {
-                            institution: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="sr-only">{t("Degree")}</span>
-                      <Input
-                        className="h-12 rounded-xl px-4"
-                        value={education.degree}
-                        placeholder={t(
-                          "Degree (e.g. Bachelor's degree, High school diploma)"
-                        )}
-                        onChange={(event) =>
-                          updateEducation(education.id, {
-                            degree: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="sr-only">{t("Field of Study")}</span>
-                      <Input
-                        className="h-12 rounded-xl px-4"
-                        value={education.fieldOfStudy ?? ""}
-                        placeholder={t("Field of Study")}
-                        onChange={(event) =>
-                          updateEducation(education.id, {
-                            fieldOfStudy: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="sr-only">
-                        {t("Relevant URL (Optional)")}
-                      </span>
-                      <Input
-                        className="h-12 rounded-xl px-4"
-                        type="url"
-                        value={education.url ?? ""}
-                        placeholder={t("Relevant URL (Optional)")}
-                        onChange={(event) =>
-                          updateEducation(education.id, {
-                            url: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <div className="grid gap-4 pt-1 sm:grid-cols-2">
-                      <DateField
-                        label="Start date"
-                        value={education.startDate}
-                        onChange={(startDate) =>
-                          updateEducation(education.id, { startDate })
-                        }
-                      />
-                      <DateField
-                        label="End date"
-                        value={education.endDate}
-                        allowPresent
-                        onChange={(endDate) =>
-                          updateEducation(education.id, { endDate })
-                        }
-                      />
-                    </div>
-                    <label className="block">
-                      <span className="sr-only">{t("Achievements")}</span>
-                      <FormattingTextarea
-                        value={education.details}
-                        placeholder={t("Achievements")}
-                        rows={6}
-                        onChange={(details) =>
-                          updateEducation(education.id, {
-                            details,
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </EditorSection>
-
-          <EditorSection
-            section="skills"
-            title="Skills"
-            icon={<Sparkles className="size-5" />}
-            activeSection={activeSection}
-            visible={sectionIsVisible("skills")}
-            orderClass="order-5"
-            onOpen={() => setActiveSection("skills")}
-            onBack={() => setActiveSection(null)}
-            onToggleVisibility={() => toggleSectionVisibility("skills")}
-          >
-            <div>
-              <FormattingTextarea
-                value={skillsText}
-                placeholder={t(
-                  "Add skills, then use the list button for bullets"
-                )}
-                rows={6}
-                onChange={(value) => {
-                  setSkillsText(value)
-                  updateContent({
-                    skills: value
-                      .split("\n")
-                      .map((item) => item.trim())
-                      .filter(Boolean),
-                  })
-                }}
-              />
-            </div>
-          </EditorSection>
-
-          <EditorSection
-            section="languages"
-            title="Languages"
-            icon={<Languages className="size-5" />}
-            activeSection={activeSection}
-            visible={sectionIsVisible("languages")}
-            orderClass="order-6"
-            onOpen={() => setActiveSection("languages")}
-            onBack={() => setActiveSection(null)}
-            onToggleVisibility={() => toggleSectionVisibility("languages")}
-          >
-            <div className="mb-7">
-              <Button
-                variant="outline"
-                className="h-12 w-full rounded-xl border-dashed bg-transparent text-base"
-                onClick={() =>
-                  updateContent({
-                    languages: [...content.languages, blankLanguage()],
-                  })
-                }
-              >
-                <Plus data-icon="inline-start" /> {t("Add")}
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              {content.languages.length === 0 && (
-                <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                  {t(
-                    "Add the languages you can use and your proficiency level."
-                  )}
-                </p>
-              )}
-              {content.languages.map((language) => (
-                <div
-                  key={language.id}
-                  className="grid gap-3 rounded-xl border bg-muted/20 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
-                >
-                  <FormField label="Language">
-                    <Input
-                      value={language.language}
-                      placeholder={t("Language")}
-                      maxLength={200}
-                      onChange={(event) =>
-                        updateLanguage(language.id, {
-                          language: event.target.value,
-                        })
-                      }
-                    />
-                  </FormField>
-                  <div className="space-y-2">
-                    <Label htmlFor={`language-proficiency-${language.id}`}>
-                      {t("Proficiency")}
-                    </Label>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        id={`language-proficiency-${language.id}`}
-                        className="group flex h-10 w-full items-center justify-between rounded-xl border border-border/70 bg-background px-3.5 text-sm font-medium shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] outline-none hover:border-foreground/20 hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 data-popup-open:border-ring/70 data-popup-open:bg-muted/50 data-popup-open:ring-3 data-popup-open:ring-ring/20"
-                      >
-                        <span className="truncate">
-                          {t(language.proficiency)}
-                        </span>
-                        <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-popup-open:rotate-180" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="start"
-                        sideOffset={8}
-                        className="min-w-(--anchor-width) rounded-2xl border border-border/60 bg-popover/98 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.14)] ring-0 backdrop-blur-xl"
-                      >
-                        <DropdownMenuRadioGroup
-                          value={language.proficiency}
-                          onValueChange={(proficiency) =>
-                            updateLanguage(language.id, {
-                              proficiency:
-                                proficiency as Language["proficiency"],
-                            })
-                          }
-                        >
-                          {languageProficiencies.map((proficiency) => (
-                            <DropdownMenuRadioItem
-                              key={proficiency}
-                              value={proficiency}
-                              className="min-h-10 rounded-xl px-3.5 py-2.5 font-normal transition-colors focus:bg-muted focus:text-foreground focus:**:text-foreground data-checked:bg-primary/10 data-checked:font-medium data-checked:text-primary"
-                            >
-                              {t(proficiency)}
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t("Remove {{language}}", {
-                      language: language.language || t("language"),
-                    })}
-                    onClick={() =>
-                      updateContent({
-                        languages: content.languages.filter(
-                          (item) => item.id !== language.id
-                        ),
-                      })
-                    }
-                  >
-                    <Trash2 />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </EditorSection>
+          )}
         </div>
 
-        <aside className="min-w-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-          <p className="mb-3 text-sm font-medium text-muted-foreground">
-            {t("Live preview")}
-          </p>
+        {/* ─── Resize Handle (Desktop only) ─── */}
+        <ResizeHandle
+          onResize={(delta) => {
+            if (!containerRef.current) return
+            const containerWidth = containerRef.current.offsetWidth
+            const newPercent =
+              splitPercent + (delta / containerWidth) * 100
+            setSplitPercent(Math.max(25, Math.min(60, newPercent)))
+          }}
+        />
+
+        {/* ─── Preview Pane ─── */}
+        <aside
+          className={cn(
+            "min-w-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden",
+            mobileView === "edit" && "hidden lg:flex"
+          )}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-medium text-muted-foreground">
+              {t("Live preview")}
+            </p>
+          </div>
           <div className="preview-scroll flex min-h-[calc(100dvh-9.75rem)] justify-center overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 lg:min-h-0 lg:flex-1 dark:bg-slate-900">
             <CvPreview content={content} />
           </div>
         </aside>
       </main>
+
+      {/* ─── Mobile Toggle Bar ─── */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 flex border-t bg-background/95 backdrop-blur lg:hidden print:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileView("edit")}
+          className={cn(
+            "flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors",
+            mobileView === "edit"
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Pencil className="size-4" />
+          {t("Edit form")}
+        </button>
+        <div className="my-2.5 w-px bg-border" />
+        <button
+          type="button"
+          onClick={() => setMobileView("preview")}
+          className={cn(
+            "flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors",
+            mobileView === "preview"
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Eye className="size-4" />
+          {t("Preview")}
+        </button>
+      </div>
     </div>
   )
 }

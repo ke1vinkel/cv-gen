@@ -9,8 +9,9 @@ import {
 } from "react"
 
 import { useLanguage } from "@/components/language-provider"
-import type { CvContent, Education, Experience } from "@/lib/cv-schema"
+import type { CvContent, CustomSection, Education, Experience } from "@/lib/cv-schema"
 import type { Translator } from "@/lib/i18n"
+import { renderInlineMarkdown, renderMarkdownBlock } from "@/lib/markdown"
 import { cn } from "@/lib/utils"
 
 const A4_WIDTH = 794
@@ -117,12 +118,14 @@ function ExperienceBlock({
           )}
         </p>
         {experience.description && (
-          <p className="cv-detail-line">{experience.description}</p>
+          <>{renderMarkdownBlock(experience.description)}</>
         )}
         {experience.bullets.length > 0 && (
           <ul>
             {experience.bullets.map((bullet, index) => (
-              <li key={`${experience.id}-${index}`}>{bullet}</li>
+              <li key={`${experience.id}-${index}`}>
+                {renderInlineMarkdown(bullet)}
+              </li>
             ))}
           </ul>
         )}
@@ -166,101 +169,223 @@ function EducationBlock({
   )
 }
 
+function CustomSectionBlock({
+  section,
+  showHeading,
+  compact,
+  t,
+}: {
+  section: CustomSection
+  showHeading: boolean
+  compact: boolean
+  t: Translator
+}) {
+  return (
+    <section
+      className={cn(
+        "cv-section",
+        !showHeading && "cv-section-continuation",
+        compact && "cv-section-compact"
+      )}
+      data-cv-block
+    >
+      {showHeading && <h2>{section.title}</h2>}
+      {section.items.map((item) => (
+        <div className="cv-entry" key={item.id}>
+          <div className="cv-entry-head">
+            <strong>{item.title}</strong>
+            {(item.startDate || item.endDate) && (
+              <DateRange
+                start={item.startDate ?? ""}
+                end={item.endDate ?? ""}
+                t={t}
+              />
+            )}
+          </div>
+          {item.subtitle && <p className="cv-subtitle">{item.subtitle}</p>}
+          {item.url && (
+            <p className="cv-subtitle">
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-current/40 underline-offset-2"
+              >
+                {item.url}
+              </a>
+            </p>
+          )}
+          {item.description && (
+            <>{renderMarkdownBlock(item.description)}</>
+          )}
+          {item.bullets && item.bullets.length > 0 && (
+            <ul>
+              {item.bullets.map((bullet, index) => (
+                <li key={`${item.id}-${index}`}>
+                  {renderInlineMarkdown(bullet)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </section>
+  )
+}
+
 function buildBlocks(content: CvContent, t: Translator): ReactNode[] {
   const blocks: ReactNode[] = []
-  const contact = [
-    content.contact.phone,
-    content.contact.email,
-    content.contact.website,
-    content.contact.location,
-  ].filter(Boolean)
+  const sectionOrder = content.sectionOrder ?? [
+    "personal",
+    "summary",
+    "experience",
+    "education",
+    "skills",
+    "languages",
+  ]
 
-  if (content.visibility?.personal ?? true) {
-    blocks.push(
-      <header className="cv-header" data-cv-block key="personal">
-        <h1>{content.name || t("Your name")}</h1>
-        {contact.length > 0 && (
-          <address>
-            {contact.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </address>
-        )}
-      </header>
-    )
-  }
+  for (const sectionId of sectionOrder) {
+    switch (sectionId) {
+      case "personal": {
+        if (!(content.visibility?.personal ?? true)) break
+        const contact = [
+          content.contact.phone,
+          content.contact.email,
+          content.contact.website,
+          content.contact.location,
+        ].filter(Boolean)
 
-  if ((content.visibility?.summary ?? true) && content.summary) {
-    blocks.push(
-      <section className="cv-section" data-cv-block key="summary">
-        <h2>{t("Summary")}</h2>
-        <p className="cv-summary">{content.summary}</p>
-      </section>
-    )
-  }
+        blocks.push(
+          <header className="cv-header" data-cv-block key="personal">
+            <h1>{content.name || t("Your name")}</h1>
+            {contact.length > 0 && (
+              <address>
+                {contact.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </address>
+            )}
+          </header>
+        )
+        break
+      }
 
-  if (
-    (content.visibility?.experience ?? true) &&
-    content.experiences.length > 0
-  ) {
-    const experiences = newestFirst(content.experiences)
-    experiences.forEach((experience, index) => {
-      blocks.push(
-        <ExperienceBlock
-          key={experience.id}
-          experience={experience}
-          showHeading={index === 0}
-          compact={index < experiences.length - 1}
-          t={t}
-        />
-      )
-    })
-  }
-
-  if ((content.visibility?.education ?? true) && content.education.length > 0) {
-    const education = newestFirst(content.education)
-    education.forEach((item, index) => {
-      blocks.push(
-        <EducationBlock
-          key={item.id}
-          education={item}
-          showHeading={index === 0}
-          compact={index < education.length - 1}
-          t={t}
-        />
-      )
-    })
-  }
-
-  if ((content.visibility?.skills ?? true) && content.skills.length > 0) {
-    blocks.push(
-      <section className="cv-section" data-cv-block key="skills">
-        <h2>{t("Skills")}</h2>
-        <ul className="cv-skills">
-          {content.skills.map((skill) => (
-            <li key={skill}>{skill}</li>
-          ))}
-        </ul>
-      </section>
-    )
-  }
-
-  if ((content.visibility?.languages ?? true) && content.languages.length > 0) {
-    blocks.push(
-      <section className="cv-section" data-cv-block key="languages">
-        <h2>{t("Languages")}</h2>
-        <div className="cv-languages">
-          {content.languages.map((language) => (
-            <div className="cv-language" key={language.id}>
-              <span className="cv-language-name">{language.language}</span>
-              {language.proficiency !== "Not Rated" && (
-                <span>{t(language.proficiency)}</span>
-              )}
+      case "summary": {
+        if (!(content.visibility?.summary ?? true) || !content.summary) break
+        blocks.push(
+          <section className="cv-section" data-cv-block key="summary">
+            <h2>{t("Summary")}</h2>
+            <div className="cv-summary">
+              {renderMarkdownBlock(content.summary)}
             </div>
-          ))}
-        </div>
-      </section>
-    )
+          </section>
+        )
+        break
+      }
+
+      case "experience": {
+        if (
+          !(content.visibility?.experience ?? true) ||
+          content.experiences.length === 0
+        )
+          break
+        const experiences = newestFirst(content.experiences)
+        experiences.forEach((experience, index) => {
+          blocks.push(
+            <ExperienceBlock
+              key={experience.id}
+              experience={experience}
+              showHeading={index === 0}
+              compact={index < experiences.length - 1}
+              t={t}
+            />
+          )
+        })
+        break
+      }
+
+      case "education": {
+        if (
+          !(content.visibility?.education ?? true) ||
+          content.education.length === 0
+        )
+          break
+        const education = newestFirst(content.education)
+        education.forEach((item, index) => {
+          blocks.push(
+            <EducationBlock
+              key={item.id}
+              education={item}
+              showHeading={index === 0}
+              compact={index < education.length - 1}
+              t={t}
+            />
+          )
+        })
+        break
+      }
+
+      case "skills": {
+        if (
+          !(content.visibility?.skills ?? true) ||
+          content.skills.length === 0
+        )
+          break
+        blocks.push(
+          <section className="cv-section" data-cv-block key="skills">
+            <h2>{t("Skills")}</h2>
+            <ul className="cv-skills">
+              {content.skills.map((skill) => (
+                <li key={skill}>{skill}</li>
+              ))}
+            </ul>
+          </section>
+        )
+        break
+      }
+
+      case "languages": {
+        if (
+          !(content.visibility?.languages ?? true) ||
+          content.languages.length === 0
+        )
+          break
+        blocks.push(
+          <section className="cv-section" data-cv-block key="languages">
+            <h2>{t("Languages")}</h2>
+            <div className="cv-languages">
+              {content.languages.map((language) => (
+                <div className="cv-language" key={language.id}>
+                  <span className="cv-language-name">{language.language}</span>
+                  {language.proficiency !== "Not Rated" && (
+                    <span>{t(language.proficiency)}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )
+        break
+      }
+
+      default: {
+        // Custom section
+        const customSection = (content.customSections ?? []).find(
+          (s) => s.id === sectionId
+        )
+        if (!customSection || customSection.items.length === 0) break
+        blocks.push(
+          <CustomSectionBlock
+            key={customSection.id}
+            section={customSection}
+            showHeading={true}
+            compact={false}
+            t={t}
+          />
+        )
+        break
+      }
+    }
   }
 
   return blocks
@@ -347,6 +472,20 @@ export function CvPreview({
           >
             {page.map((blockIndex) => blocks[blockIndex])}
           </article>
+
+          {/* Page counter badge */}
+          {pages.length > 1 && (
+            <div
+              className="cv-page-badge"
+              aria-hidden="true"
+              style={{ transform: `scale(${scale})` }}
+            >
+              {t("Page {{page}} of {{total}}", {
+                page: pageIndex + 1,
+                total: pages.length,
+              })}
+            </div>
+          )}
         </div>
       ))}
     </div>

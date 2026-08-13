@@ -7,6 +7,7 @@ import { LanguageToggle } from "@/components/language-toggle"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { getSessionUser } from "@/lib/auth"
 import type { CvContent } from "@/lib/cv-schema"
+import { defaultSectionOrder } from "@/lib/cv-schema"
 import { translate } from "@/lib/i18n"
 import { getLocale } from "@/lib/locale"
 
@@ -47,6 +48,8 @@ const sampleCv: CvContent = {
   ],
   skills: ["Product Design", "User Research", "Prototyping", "Figma"],
   languages: [],
+  customSections: [],
+  sectionOrder: [...defaultSectionOrder],
 }
 
 export default async function LoginPage() {

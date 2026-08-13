@@ -36,6 +36,24 @@ export const experienceSchema = z.object({
   bullets: z.array(z.string().trim().min(1).max(500)).max(12),
 })
 
+export const customSectionItemSchema = z.object({
+  id: z.string().min(1),
+  title: requiredText,
+  subtitle: optionalText,
+  startDate: monthYear.optional(),
+  endDate: endMonthYear.optional(),
+  location: optionalText.optional(),
+  url: optionalUrl.optional(),
+  description: z.string().trim().max(2000).optional(),
+  bullets: z.array(z.string().trim().min(1).max(500)).max(12),
+})
+
+export const customSectionSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().trim().min(1).max(100),
+  items: z.array(customSectionItemSchema).max(12),
+})
+
 export const educationSchema = z.object({
   id: z.string().min(1),
   degree: requiredText,
@@ -73,6 +91,18 @@ export const cvContentSchema = z.object({
   education: z.array(educationSchema).max(8),
   skills: z.array(z.string().trim().min(1).max(100)).max(30),
   languages: z.array(languageSchema).max(12).default([]),
+  customSections: z.array(customSectionSchema).max(6).default([]),
+  sectionOrder: z
+    .array(z.string().trim().min(1).max(100))
+    .max(20)
+    .default([
+      "personal",
+      "summary",
+      "experience",
+      "education",
+      "skills",
+      "languages",
+    ]),
   visibility: z
     .object({
       personal: z.boolean(),
@@ -94,6 +124,8 @@ export type CvContent = z.infer<typeof cvContentSchema>
 export type Experience = z.infer<typeof experienceSchema>
 export type Education = z.infer<typeof educationSchema>
 export type Language = z.infer<typeof languageSchema>
+export type CustomSection = z.infer<typeof customSectionSchema>
+export type CustomSectionItem = z.infer<typeof customSectionItemSchema>
 
 export type CvRecord = {
   id: string
@@ -107,6 +139,15 @@ export type CvSummary = Pick<
   CvRecord,
   "id" | "title" | "createdAt" | "updatedAt"
 >
+
+export const defaultSectionOrder: string[] = [
+  "personal",
+  "summary",
+  "experience",
+  "education",
+  "skills",
+  "languages",
+]
 
 export function createEmptyCv(email = ""): CvContent {
   return {
@@ -122,6 +163,8 @@ export function createEmptyCv(email = ""): CvContent {
     education: [],
     skills: [],
     languages: [],
+    customSections: [],
+    sectionOrder: [...defaultSectionOrder],
     visibility: {
       personal: true,
       summary: true,

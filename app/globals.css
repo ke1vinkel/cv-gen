@@ -483,9 +483,32 @@ body {
   }
 }
 
+.cv-page-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: oklch(0.2 0 0 / 72%);
+  color: #ffffff;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+  letter-spacing: 0.3px;
+  transform-origin: bottom right;
+  pointer-events: none;
+  user-select: none;
+}
+
 @media (max-width: 720px) {
   .cv-document {
     gap: 16px;
+  }
+}
+
+/* Mobile bottom bar safe area */
+@media (max-width: 1023px) {
+  main {
+    padding-bottom: 64px;
   }
 }
 
@@ -517,6 +540,10 @@ body {
   }
 
   .cv-measure {
+    display: none;
+  }
+
+  .cv-page-badge {
     display: none;
   }
 }
