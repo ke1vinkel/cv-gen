@@ -1,0 +1,43 @@
+import { createClient } from "@libsql/client"
+
+function required(name) {
+  const value = process.env[name]
+  if (!value) throw new Error(`Missing required environment variable: ${name}`)
+  return value
+}
+
+const app = createClient({
+  url: required("APP_DATABASE_URL"),
+  authToken: required("APP_DATABASE_TOKEN"),
+})
+
+await app.batch(
+  [
+    `CREATE TABLE IF NOT EXISTS cv_users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      nim_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS cv_sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES cv_users(id) ON DELETE CASCADE
+    )`,
+    "CREATE INDEX IF NOT EXISTS cv_sessions_user_id_idx ON cv_sessions(user_id)",
+    `CREATE TABLE IF NOT EXISTS cvs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
+    "CREATE INDEX IF NOT EXISTS cvs_user_updated_idx ON cvs(user_id, updated_at DESC)",
+  ],
+  "write"
+)
+
+console.log("schema is ready.")
