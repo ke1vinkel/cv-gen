@@ -83,7 +83,23 @@ function ExperienceBlock({
           <strong>{experience.role}</strong>
           <DateRange start={experience.startDate} end={experience.endDate} />
         </div>
-        <p className="cv-subtitle">{experience.organization}</p>
+        <p className="cv-subtitle">
+          {experience.url ? (
+            <a
+              href={experience.url}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-current/40 underline-offset-2"
+            >
+              {experience.organization}
+            </a>
+          ) : (
+            experience.organization
+          )}
+        </p>
+        {experience.description && (
+          <p className="cv-detail-line">{experience.description}</p>
+        )}
         {experience.bullets.length > 0 && (
           <ul>
             {experience.bullets.map((bullet, index) => (
@@ -202,6 +218,24 @@ function buildBlocks(content: CvContent): ReactNode[] {
             <li key={skill}>{skill}</li>
           ))}
         </ul>
+      </section>
+    )
+  }
+
+  if ((content.visibility?.languages ?? true) && content.languages.length > 0) {
+    blocks.push(
+      <section className="cv-section" data-cv-block key="languages">
+        <h2>Languages</h2>
+        <div className="cv-languages">
+          {content.languages.map((language) => (
+            <div className="cv-language" key={language.id}>
+              <span className="cv-language-name">{language.language}</span>
+              {language.proficiency !== "Not Rated" && (
+                <span>{language.proficiency}</span>
+              )}
+            </div>
+          ))}
+        </div>
       </section>
     )
   }

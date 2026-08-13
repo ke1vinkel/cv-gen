@@ -40,14 +40,13 @@ export function AuthForm() {
   }
 
   return (
-    <form className="space-y-5" onSubmit={submit}>
+    <form className="space-y-5" autoComplete="off" onSubmit={submit}>
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
           id="email"
           name="email"
           type="email"
-          autoComplete="email"
           placeholder="student@domain.com"
           required
         />
@@ -58,7 +57,6 @@ export function AuthForm() {
           id="nim"
           name="nim"
           type="password"
-          autoComplete="current-password"
           minLength={1}
           maxLength={20}
           placeholder="Enter your password"

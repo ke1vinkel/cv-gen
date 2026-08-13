@@ -43,6 +43,7 @@ const sampleCv: CvContent = {
     },
   ],
   skills: ["Product Design", "User Research", "Prototyping", "Figma"],
+  languages: [],
 }
 
 export default async function LoginPage() {

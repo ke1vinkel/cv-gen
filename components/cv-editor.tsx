@@ -11,7 +11,9 @@ import {
   Eye,
   EyeOff,
   GraduationCap,
+  House,
   Italic,
+  Languages,
   Link2,
   List,
   ListIcon,
@@ -35,6 +37,13 @@ import {
 
 import { CvPreview } from "@/components/cv-preview"
 import { Button, buttonVariants } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -43,11 +52,22 @@ import type {
   CvRecord,
   Education,
   Experience,
+  Language,
 } from "@/lib/cv-schema"
 import { cn } from "@/lib/utils"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
-type SectionKey = "personal" | "summary" | "experience" | "education" | "skills"
+type SectionKey =
+  "personal" | "summary" | "experience" | "education" | "skills" | "languages"
+
+const languageProficiencies: Language["proficiency"][] = [
+  "Not Rated",
+  "Elementary",
+  "Limited Working",
+  "Professional Working",
+  "Full Professional",
+  "Native or Bilingual",
+]
 
 function FormattingTextarea({
   value,
@@ -87,13 +107,68 @@ function FormattingTextarea({
     const start = value.lastIndexOf("\n", textarea.selectionStart - 1) + 1
     const nextBreak = value.indexOf("\n", textarea.selectionEnd)
     const end = nextBreak === -1 ? value.length : nextBreak
+    const selectionStart = textarea.selectionStart
+    const selectionEnd = textarea.selectionEnd
     const lines = value.slice(start, end).split("\n")
-    const remove = lines.every((line) => line.startsWith("- "))
+    const remove = lines.every((line) => line.startsWith("• "))
     const replacement = lines
-      .map((line) => (remove ? line.slice(2) : `- ${line}`))
+      .map((line) => (remove ? line.slice(2) : `• ${line}`))
       .join("\n")
     onChange(`${value.slice(0, start)}${replacement}${value.slice(end)}`)
-    requestAnimationFrame(() => textarea.focus())
+    const nextSelectionStart = remove
+      ? Math.max(start, selectionStart - 2)
+      : selectionStart + 2
+    const nextSelectionEnd = remove
+      ? Math.max(start, selectionEnd - 2 * lines.length)
+      : selectionEnd + 2 * lines.length
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.setSelectionRange(nextSelectionStart, nextSelectionEnd)
+    })
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    const textarea = event.currentTarget
+    const lineStart = value.lastIndexOf("\n", textarea.selectionStart - 1) + 1
+    const beforeCaret = value.slice(lineStart, textarea.selectionStart)
+
+    if (event.key === "Enter" && beforeCaret.startsWith("• ")) {
+      event.preventDefault()
+
+      if (beforeCaret === "• ") {
+        const next = `${value.slice(0, lineStart)}${value.slice(textarea.selectionEnd)}`
+        onChange(next)
+        requestAnimationFrame(() => {
+          textarea.focus()
+          textarea.setSelectionRange(lineStart, lineStart)
+        })
+        return
+      }
+
+      const insertion = "\n• "
+      const nextCaret = textarea.selectionStart + insertion.length
+      onChange(
+        `${value.slice(0, textarea.selectionStart)}${insertion}${value.slice(textarea.selectionEnd)}`
+      )
+      requestAnimationFrame(() => {
+        textarea.focus()
+        textarea.setSelectionRange(nextCaret, nextCaret)
+      })
+    }
+
+    if (
+      event.key === "Backspace" &&
+      textarea.selectionStart === textarea.selectionEnd &&
+      beforeCaret === "• "
+    ) {
+      event.preventDefault()
+      const next = `${value.slice(0, lineStart)}${value.slice(textarea.selectionStart)}`
+      onChange(next)
+      requestAnimationFrame(() => {
+        textarea.focus()
+        textarea.setSelectionRange(lineStart, lineStart)
+      })
+    }
   }
 
   const toolClass = "size-9 rounded-lg"
@@ -169,6 +244,7 @@ function FormattingTextarea({
         value={value}
         placeholder={placeholder}
         rows={rows}
+        onKeyDown={handleKeyDown}
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
@@ -295,59 +371,17 @@ function EditorSection({
   )
 }
 
-function EndDateField({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (value: string) => void
-}) {
-  const id = useId()
+function formatMonthYear(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 6)
+  if (!digits) return ""
 
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>End date</Label>
-      <div className="flex gap-2">
-        <Input
-          id={id}
-          className="h-12 rounded-xl px-4"
-          value={value}
-          placeholder="MM/YYYY"
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <Button
-          type="button"
-          className="h-12 rounded-xl px-4"
-          variant={value === "Present" ? "secondary" : "outline"}
-          onClick={() => onChange("Present")}
-        >
-          Present
-        </Button>
-      </div>
-    </div>
-  )
+  const normalized = /^[2-9]$/.test(digits) ? `0${digits}` : digits
+  return normalized.length > 2
+    ? `${normalized.slice(0, 2)}/${normalized.slice(2)}`
+    : normalized
 }
 
-const MONTHS = [
-  ["01", "January"],
-  ["02", "February"],
-  ["03", "March"],
-  ["04", "April"],
-  ["05", "May"],
-  ["06", "June"],
-  ["07", "July"],
-  ["08", "August"],
-  ["09", "September"],
-  ["10", "October"],
-  ["11", "November"],
-  ["12", "December"],
-] as const
-
-const YEARS = Array.from({ length: 61 }, (_, index) =>
-  String(new Date().getFullYear() + 5 - index)
-)
-
-function EducationDateField({
+function DateField({
   label,
   value,
   allowPresent = false,
@@ -358,71 +392,50 @@ function EducationDateField({
   allowPresent?: boolean
   onChange: (value: string) => void
 }) {
+  const id = useId()
   const isPresent = value === "Present"
-  const [month = "", year = ""] = isPresent ? [] : value.split("/")
 
-  function updateDate(nextMonth: string, nextYear: string) {
-    onChange(nextMonth || nextYear ? `${nextMonth}/${nextYear}` : "")
+  function updateValue(nextValue: string) {
+    const formatted = formatMonthYear(nextValue)
+    if (
+      formatted === "" ||
+      formatted === "0" ||
+      formatted === "1" ||
+      /^(0[1-9]|1[0-2])(?:\/\d{0,4})?$/.test(formatted)
+    ) {
+      onChange(formatted)
+    }
   }
 
-  const selectClassName =
-    "h-12 w-full appearance-none rounded-xl border border-transparent bg-input/50 px-4 pr-9 text-sm text-foreground outline-none transition-[color,box-shadow,background-color] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
-
   return (
-    <fieldset className="min-w-0 space-y-2.5">
-      <legend className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </legend>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="relative">
-          <span className="sr-only">{label} month</span>
-          <select
-            value={month}
-            disabled={isPresent}
-            onChange={(event) => updateDate(event.target.value, year)}
-            className={selectClassName}
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          id={id}
+          className="h-12 rounded-xl px-4"
+          value={isPresent ? "" : value}
+          placeholder="MM/YYYY"
+          inputMode="numeric"
+          maxLength={7}
+          pattern="(0[1-9]|1[0-2])/\d{4}"
+          disabled={isPresent}
+          aria-label={`${label}, MM/YYYY`}
+          onChange={(event) => updateValue(event.target.value)}
+        />
+        {allowPresent && (
+          <Button
+            type="button"
+            className="h-12 rounded-xl px-4"
+            variant={isPresent ? "secondary" : "outline"}
+            aria-pressed={isPresent}
+            onClick={() => onChange(isPresent ? "" : "Present")}
           >
-            <option value="">Month</option>
-            {MONTHS.map(([number, name]) => (
-              <option key={number} value={number}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        </label>
-        <label className="relative">
-          <span className="sr-only">{label} year</span>
-          <select
-            value={year}
-            disabled={isPresent}
-            onChange={(event) => updateDate(month, event.target.value)}
-            className={selectClassName}
-          >
-            <option value="">Year</option>
-            {YEARS.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        </label>
+            Present
+          </Button>
+        )}
       </div>
-      {allowPresent && (
-        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={isPresent}
-            onChange={(event) =>
-              onChange(event.target.checked ? "Present" : "")
-            }
-            className="size-4 rounded border-border accent-primary"
-          />
-          Present
-        </label>
-      )}
-    </fieldset>
+    </div>
   )
 }
 
@@ -431,8 +444,10 @@ function blankExperience(): Experience {
     id: crypto.randomUUID(),
     role: "New role",
     organization: "Organization",
+    url: "",
     startDate: "",
     endDate: "",
+    description: "",
     bullets: [],
   }
 }
@@ -450,6 +465,14 @@ function blankEducation(): Education {
   }
 }
 
+function blankLanguage(language = ""): Language {
+  return {
+    id: crypto.randomUUID(),
+    language,
+    proficiency: "Not Rated",
+  }
+}
+
 export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
   const [title, setTitle] = useState(initialCv.title)
   const [content, setContent] = useState<CvContent>(initialCv.content)
@@ -461,7 +484,12 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
     Object.fromEntries(
       initialCv.content.experiences.map((experience) => [
         experience.id,
-        experience.bullets.join("\n"),
+        [
+          experience.description,
+          ...experience.bullets.map((bullet) => `• ${bullet}`),
+        ]
+          .filter(Boolean)
+          .join("\n"),
       ])
     )
   )
@@ -530,6 +558,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
         experience: content.visibility?.experience ?? true,
         education: content.visibility?.education ?? true,
         skills: content.visibility?.skills ?? true,
+        languages: content.visibility?.languages ?? true,
         [section]: !sectionIsVisible(section),
       },
     })
@@ -546,6 +575,14 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
   function updateEducation(id: string, patch: Partial<Education>) {
     updateContent({
       education: content.education.map((item) =>
+        item.id === id ? { ...item, ...patch } : item
+      ),
+    })
+  }
+
+  function updateLanguage(id: string, patch: Partial<Language>) {
+    updateContent({
+      languages: content.languages.map((item) =>
         item.id === id ? { ...item, ...patch } : item
       ),
     })
@@ -597,7 +634,25 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
     <div className="min-h-[100dvh] bg-muted/40">
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 print:hidden">
         <div className="flex min-h-16 w-full flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Link
+              href="/dashboard"
+              aria-label="Back to dashboard"
+              aria-disabled={isDirty}
+              onNavigate={(event) => {
+                if (!isDirty) return
+
+                event.preventDefault()
+                setMessage("Save your changes before leaving.")
+              }}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "icon-sm" }),
+                "shrink-0",
+                isDirty && "cursor-not-allowed opacity-60"
+              )}
+            >
+              <House />
+            </Link>
             <Input
               value={title}
               onChange={(event) => {
@@ -606,7 +661,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               }}
               aria-label="CV title"
               maxLength={100}
-              className="max-w-md bg-transparent text-base font-semibold"
+              className="min-w-0 max-w-md bg-transparent text-base font-semibold"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -749,7 +804,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             icon={<List className="size-5" />}
             activeSection={activeSection}
             visible={sectionIsVisible("summary")}
-            orderClass="order-5"
+            orderClass="order-2"
             onOpen={() => setActiveSection("summary")}
             onBack={() => setActiveSection(null)}
             onToggleVisibility={() => toggleSectionVisibility("summary")}
@@ -774,7 +829,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             icon={<BriefcaseBusiness className="size-5" />}
             activeSection={activeSection}
             visible={sectionIsVisible("experience")}
-            orderClass="order-2"
+            orderClass="order-3"
             onOpen={() => setActiveSection("experience")}
             onBack={() => setActiveSection(null)}
             onToggleVisibility={() => toggleSectionVisibility("experience")}
@@ -844,21 +899,31 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                         }
                       />
                     </FormField>
+                    <FormField label="Company or project link">
+                      <Input
+                        className="h-12 rounded-xl px-4"
+                        type="url"
+                        value={experience.url ?? ""}
+                        placeholder="https://company.com"
+                        onChange={(event) =>
+                          updateExperience(experience.id, {
+                            url: event.target.value,
+                          })
+                        }
+                      />
+                    </FormField>
                     <div className="grid gap-5 sm:grid-cols-2">
-                      <FormField label="Start date">
-                        <Input
-                          className="h-12 rounded-xl px-4"
-                          value={experience.startDate}
-                          placeholder="MM/YYYY"
-                          onChange={(event) =>
-                            updateExperience(experience.id, {
-                              startDate: event.target.value,
-                            })
-                          }
-                        />
-                      </FormField>
-                      <EndDateField
+                      <DateField
+                        label="Start date"
+                        value={experience.startDate}
+                        onChange={(startDate) =>
+                          updateExperience(experience.id, { startDate })
+                        }
+                      />
+                      <DateField
+                        label="End date"
                         value={experience.endDate}
+                        allowPresent
                         onChange={(endDate) =>
                           updateExperience(experience.id, { endDate })
                         }
@@ -868,7 +933,14 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                       <FormattingTextarea
                         value={
                           highlightsText[experience.id] ??
-                          experience.bullets.join("\n")
+                          [
+                            experience.description,
+                            ...experience.bullets.map(
+                              (bullet) => `• ${bullet}`
+                            ),
+                          ]
+                            .filter(Boolean)
+                            .join("\n")
                         }
                         placeholder="Describe your accomplishments"
                         rows={4}
@@ -877,10 +949,15 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                             ...current,
                             [experience.id]: value,
                           }))
+                          const lines = value.split("\n")
                           updateExperience(experience.id, {
-                            bullets: value
-                              .split("\n")
-                              .map((item) => item.trim())
+                            description: lines
+                              .filter((line) => !line.startsWith("• "))
+                              .join("\n")
+                              .trim(),
+                            bullets: lines
+                              .filter((line) => line.startsWith("• "))
+                              .map((line) => line.slice(2).trim())
                               .filter(Boolean),
                           })
                         }}
@@ -898,7 +975,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             icon={<GraduationCap className="size-5" />}
             activeSection={activeSection}
             visible={sectionIsVisible("education")}
-            orderClass="order-3"
+            orderClass="order-4"
             onOpen={() => setActiveSection("education")}
             onBack={() => setActiveSection(null)}
             onToggleVisibility={() => toggleSectionVisibility("education")}
@@ -1000,14 +1077,14 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                       />
                     </label>
                     <div className="grid gap-4 pt-1 sm:grid-cols-2">
-                      <EducationDateField
+                      <DateField
                         label="Start date"
                         value={education.startDate}
                         onChange={(startDate) =>
                           updateEducation(education.id, { startDate })
                         }
                       />
-                      <EducationDateField
+                      <DateField
                         label="End date"
                         value={education.endDate}
                         allowPresent
@@ -1041,7 +1118,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             icon={<Sparkles className="size-5" />}
             activeSection={activeSection}
             visible={sectionIsVisible("skills")}
-            orderClass="order-4"
+            orderClass="order-5"
             onOpen={() => setActiveSection("skills")}
             onBack={() => setActiveSection(null)}
             onToggleVisibility={() => toggleSectionVisibility("skills")}
@@ -1061,6 +1138,112 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                   })
                 }}
               />
+            </div>
+          </EditorSection>
+
+          <EditorSection
+            section="languages"
+            title="Languages"
+            icon={<Languages className="size-5" />}
+            activeSection={activeSection}
+            visible={sectionIsVisible("languages")}
+            orderClass="order-6"
+            onOpen={() => setActiveSection("languages")}
+            onBack={() => setActiveSection(null)}
+            onToggleVisibility={() => toggleSectionVisibility("languages")}
+          >
+            <div className="mb-7">
+              <Button
+                variant="outline"
+                className="h-12 w-full rounded-xl border-dashed bg-transparent text-base"
+                onClick={() =>
+                  updateContent({
+                    languages: [...content.languages, blankLanguage()],
+                  })
+                }
+              >
+                <Plus data-icon="inline-start" /> Add
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {content.languages.length === 0 && (
+                <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+                  Add the languages you can use and your proficiency level.
+                </p>
+              )}
+              {content.languages.map((language) => (
+                <div
+                  key={language.id}
+                  className="grid gap-3 rounded-xl border bg-muted/20 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+                >
+                  <FormField label="Language">
+                    <Input
+                      value={language.language}
+                      placeholder="Language"
+                      maxLength={200}
+                      onChange={(event) =>
+                        updateLanguage(language.id, {
+                          language: event.target.value,
+                        })
+                      }
+                    />
+                  </FormField>
+                  <div className="space-y-2">
+                    <Label htmlFor={`language-proficiency-${language.id}`}>
+                      Proficiency
+                    </Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        id={`language-proficiency-${language.id}`}
+                        className="group flex h-10 w-full items-center justify-between rounded-xl border border-border/70 bg-background px-3.5 text-sm font-medium shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] outline-none hover:border-foreground/20 hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 data-popup-open:border-ring/70 data-popup-open:bg-muted/50 data-popup-open:ring-3 data-popup-open:ring-ring/20"
+                      >
+                        <span className="truncate">{language.proficiency}</span>
+                        <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-popup-open:rotate-180" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        sideOffset={8}
+                        className="min-w-(--anchor-width) rounded-2xl border border-border/60 bg-popover/98 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.14)] ring-0 backdrop-blur-xl"
+                      >
+                        <DropdownMenuRadioGroup
+                          value={language.proficiency}
+                          onValueChange={(proficiency) =>
+                            updateLanguage(language.id, {
+                              proficiency:
+                                proficiency as Language["proficiency"],
+                            })
+                          }
+                        >
+                          {languageProficiencies.map((proficiency) => (
+                            <DropdownMenuRadioItem
+                              key={proficiency}
+                              value={proficiency}
+                              className="min-h-10 rounded-xl px-3.5 py-2.5 font-normal transition-colors focus:bg-muted focus:text-foreground focus:**:text-foreground data-checked:bg-primary/10 data-checked:font-medium data-checked:text-primary"
+                            >
+                              {proficiency}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove ${language.language || "language"}`}
+                    onClick={() =>
+                      updateContent({
+                        languages: content.languages.filter(
+                          (item) => item.id !== language.id
+                        ),
+                      })
+                    }
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              ))}
             </div>
           </EditorSection>
         </div>
