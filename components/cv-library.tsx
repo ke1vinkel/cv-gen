@@ -180,7 +180,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
               {cvs.map((cv) => (
                 <Card
                   key={cv.id}
-                  className="shadow-none transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_12px_35px_rgba(15,23,42,0.06)]"
+                  className="ui-stagger-item shadow-none transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_12px_35px_rgba(15,23,42,0.06)]"
                 >
                   <CardHeader>
                     <CardTitle className="truncate pr-8">{cv.title}</CardTitle>

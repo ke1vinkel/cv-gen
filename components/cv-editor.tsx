@@ -2,18 +2,25 @@
 
 import {
   ArrowLeft,
+  AlignLeft,
+  Bold,
   BriefcaseBusiness,
   Check,
+  ChevronDown,
   ChevronRight,
   Eye,
   EyeOff,
   GraduationCap,
+  Italic,
+  Link2,
   List,
+  ListIcon,
   LoaderCircle,
   Plus,
   Save,
   Sparkles,
   Trash2,
+  Underline,
   UserRound,
 } from "lucide-react"
 import Link from "next/link"
@@ -41,6 +48,132 @@ import { cn } from "@/lib/utils"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
 type SectionKey = "personal" | "summary" | "experience" | "education" | "skills"
+
+function FormattingTextarea({
+  value,
+  onChange,
+  placeholder,
+  rows = 6,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  rows?: number
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  function replaceSelection(prefix: string, suffix = prefix) {
+    const textarea = ref.current
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = value.slice(start, end) || "text"
+    const next = `${value.slice(0, start)}${prefix}${selected}${suffix}${value.slice(end)}`
+    onChange(next)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.setSelectionRange(
+        start + prefix.length,
+        start + prefix.length + selected.length
+      )
+    })
+  }
+
+  function toggleList() {
+    const textarea = ref.current
+    if (!textarea) return
+
+    const start = value.lastIndexOf("\n", textarea.selectionStart - 1) + 1
+    const nextBreak = value.indexOf("\n", textarea.selectionEnd)
+    const end = nextBreak === -1 ? value.length : nextBreak
+    const lines = value.slice(start, end).split("\n")
+    const remove = lines.every((line) => line.startsWith("- "))
+    const replacement = lines
+      .map((line) => (remove ? line.slice(2) : `- ${line}`))
+      .join("\n")
+    onChange(`${value.slice(0, start)}${replacement}${value.slice(end)}`)
+    requestAnimationFrame(() => textarea.focus())
+  }
+
+  const toolClass = "size-9 rounded-lg"
+
+  return (
+    <div className="overflow-hidden rounded-xl bg-input/50 focus-within:ring-3 focus-within:ring-ring/30">
+      <div className="flex flex-wrap items-center gap-1 border-b px-2 py-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={toolClass}
+          onClick={() => replaceSelection("**")}
+          aria-label="Bold"
+        >
+          <Bold />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={toolClass}
+          onClick={() => replaceSelection("*")}
+          aria-label="Italic"
+        >
+          <Italic />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={toolClass}
+          onClick={() => replaceSelection("__")}
+          aria-label="Underline"
+        >
+          <Underline />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={toolClass}
+          onClick={() => replaceSelection("[", "](https://)")}
+          aria-label="Add link"
+        >
+          <Link2 />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={toolClass}
+          onClick={toggleList}
+          aria-label="Toggle bullet list"
+        >
+          <ListIcon />
+        </Button>
+        <span className="mx-1 h-6 w-px bg-border" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={toolClass}
+          aria-label="Align left"
+          disabled
+        >
+          <AlignLeft />
+        </Button>
+      </div>
+      <Textarea
+        ref={ref}
+        className="min-h-36 resize-y rounded-none bg-transparent px-4 py-4 focus-visible:border-transparent focus-visible:ring-0"
+        value={value}
+        placeholder={placeholder}
+        rows={rows}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  )
+}
 
 function FormField({
   label,
@@ -132,7 +265,7 @@ function EditorSection({
   }
 
   return (
-    <section className="mx-auto w-full max-w-2xl px-1 py-5 sm:px-5 sm:py-7">
+    <section className="ui-section-enter mx-auto w-full max-w-2xl px-1 py-5 sm:px-5 sm:py-7">
       <header className="mb-8 flex items-center gap-3">
         <Button
           type="button"
@@ -177,12 +310,14 @@ function EndDateField({
       <div className="flex gap-2">
         <Input
           id={id}
+          className="h-12 rounded-xl px-4"
           value={value}
           placeholder="MM/YYYY"
           onChange={(event) => onChange(event.target.value)}
         />
         <Button
           type="button"
+          className="h-12 rounded-xl px-4"
           variant={value === "Present" ? "secondary" : "outline"}
           onClick={() => onChange("Present")}
         >
@@ -190,6 +325,104 @@ function EndDateField({
         </Button>
       </div>
     </div>
+  )
+}
+
+const MONTHS = [
+  ["01", "January"],
+  ["02", "February"],
+  ["03", "March"],
+  ["04", "April"],
+  ["05", "May"],
+  ["06", "June"],
+  ["07", "July"],
+  ["08", "August"],
+  ["09", "September"],
+  ["10", "October"],
+  ["11", "November"],
+  ["12", "December"],
+] as const
+
+const YEARS = Array.from({ length: 61 }, (_, index) =>
+  String(new Date().getFullYear() + 5 - index)
+)
+
+function EducationDateField({
+  label,
+  value,
+  allowPresent = false,
+  onChange,
+}: {
+  label: string
+  value: string
+  allowPresent?: boolean
+  onChange: (value: string) => void
+}) {
+  const isPresent = value === "Present"
+  const [month = "", year = ""] = isPresent ? [] : value.split("/")
+
+  function updateDate(nextMonth: string, nextYear: string) {
+    onChange(nextMonth || nextYear ? `${nextMonth}/${nextYear}` : "")
+  }
+
+  const selectClassName =
+    "h-12 w-full appearance-none rounded-xl border border-transparent bg-input/50 px-4 pr-9 text-sm text-foreground outline-none transition-[color,box-shadow,background-color] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
+
+  return (
+    <fieldset className="min-w-0 space-y-2.5">
+      <legend className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </legend>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="relative">
+          <span className="sr-only">{label} month</span>
+          <select
+            value={month}
+            disabled={isPresent}
+            onChange={(event) => updateDate(event.target.value, year)}
+            className={selectClassName}
+          >
+            <option value="">Month</option>
+            {MONTHS.map(([number, name]) => (
+              <option key={number} value={number}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        </label>
+        <label className="relative">
+          <span className="sr-only">{label} year</span>
+          <select
+            value={year}
+            disabled={isPresent}
+            onChange={(event) => updateDate(month, event.target.value)}
+            className={selectClassName}
+          >
+            <option value="">Year</option>
+            {YEARS.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        </label>
+      </div>
+      {allowPresent && (
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={isPresent}
+            onChange={(event) =>
+              onChange(event.target.checked ? "Present" : "")
+            }
+            className="size-4 rounded border-border accent-primary"
+          />
+          Present
+        </label>
+      )}
+    </fieldset>
   )
 }
 
@@ -209,6 +442,8 @@ function blankEducation(): Education {
     id: crypto.randomUUID(),
     degree: "Degree or programme",
     institution: "Institution",
+    fieldOfStudy: "",
+    url: "",
     startDate: "",
     endDate: "",
     details: "",
@@ -426,8 +661,8 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
         </div>
       </div>
 
-      <main className="grid w-full gap-4 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(360px,36%)_minmax(0,1fr)] lg:items-start">
-        <div className="flex flex-col self-start overflow-hidden rounded-2xl border bg-background px-5 shadow-[0_12px_40px_rgba(15,23,42,0.05)] sm:px-7">
+      <main className="grid w-full gap-4 p-4 sm:gap-6 sm:p-6 lg:h-[calc(100dvh-4rem)] lg:grid-cols-[minmax(360px,36%)_minmax(0,1fr)] lg:items-stretch lg:overflow-hidden">
+        <div className="editor-scroll flex flex-col self-start overflow-hidden rounded-2xl border bg-background px-5 shadow-[0_12px_40px_rgba(15,23,42,0.05)] sm:px-7 lg:h-full lg:self-stretch lg:overflow-y-auto">
           <EditorSection
             section="personal"
             title="Personal details"
@@ -544,20 +779,20 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             onBack={() => setActiveSection(null)}
             onToggleVisibility={() => toggleSectionVisibility("experience")}
           >
-            <div className="mb-4 flex justify-end">
+            <div className="mb-7">
               <Button
                 variant="outline"
-                size="sm"
+                className="h-12 w-full rounded-xl border-dashed bg-transparent text-base hover:border-foreground/30"
                 onClick={() =>
                   updateContent({
                     experiences: [...content.experiences, blankExperience()],
                   })
                 }
               >
-                <Plus data-icon="inline-start" /> Add role
+                <Plus data-icon="inline-start" /> Add Experience
               </Button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-8">
               {content.experiences.length === 0 && (
                 <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
                   Add internships, employment, freelance work, or substantial
@@ -567,15 +802,13 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               {content.experiences.map((experience) => (
                 <div
                   key={experience.id}
-                  className="space-y-4 rounded-xl border bg-muted/20 p-4"
+                  className="space-y-5 border-b pb-8 last:border-b-0 last:pb-0"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <strong className="truncate text-sm">
-                      {experience.role}
-                    </strong>
+                  <div className="flex justify-end">
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
                       aria-label={`Remove ${experience.role}`}
                       onClick={() =>
                         updateContent({
@@ -585,12 +818,13 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                         })
                       }
                     >
-                      <Trash2 />
+                      Delete <Trash2 data-icon="inline-end" />
                     </Button>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormField label="Role">
+                  <div className="space-y-5">
+                    <FormField label="Job title">
                       <Input
+                        className="h-12 rounded-xl px-4"
                         value={experience.role}
                         onChange={(event) =>
                           updateExperience(experience.id, {
@@ -599,8 +833,9 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                         }
                       />
                     </FormField>
-                    <FormField label="Organization">
+                    <FormField label="Company or project name">
                       <Input
+                        className="h-12 rounded-xl px-4"
                         value={experience.organization}
                         onChange={(event) =>
                           updateExperience(experience.id, {
@@ -609,38 +844,41 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                         }
                       />
                     </FormField>
-                    <FormField label="Start date">
-                      <Input
-                        value={experience.startDate}
-                        placeholder="01/2025"
-                        onChange={(event) =>
-                          updateExperience(experience.id, {
-                            startDate: event.target.value,
-                          })
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <FormField label="Start date">
+                        <Input
+                          className="h-12 rounded-xl px-4"
+                          value={experience.startDate}
+                          placeholder="MM/YYYY"
+                          onChange={(event) =>
+                            updateExperience(experience.id, {
+                              startDate: event.target.value,
+                            })
+                          }
+                        />
+                      </FormField>
+                      <EndDateField
+                        value={experience.endDate}
+                        onChange={(endDate) =>
+                          updateExperience(experience.id, { endDate })
                         }
                       />
-                    </FormField>
-                    <EndDateField
-                      value={experience.endDate}
-                      onChange={(endDate) =>
-                        updateExperience(experience.id, { endDate })
-                      }
-                    />
-                    <FormField label="Highlights" className="sm:col-span-2">
-                      <Textarea
+                    </div>
+                    <FormField label="Accomplishments">
+                      <FormattingTextarea
                         value={
                           highlightsText[experience.id] ??
                           experience.bullets.join("\n")
                         }
-                        placeholder="One achievement per line"
+                        placeholder="Describe your accomplishments"
                         rows={4}
-                        onChange={(event) => {
+                        onChange={(value) => {
                           setHighlightsText((current) => ({
                             ...current,
-                            [experience.id]: event.target.value,
+                            [experience.id]: value,
                           }))
                           updateExperience(experience.id, {
-                            bullets: event.target.value
+                            bullets: value
                               .split("\n")
                               .map((item) => item.trim())
                               .filter(Boolean),
@@ -665,10 +903,10 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             onBack={() => setActiveSection(null)}
             onToggleVisibility={() => toggleSectionVisibility("education")}
           >
-            <div className="mb-4 flex justify-end">
+            <div className="mb-5">
               <Button
                 variant="outline"
-                size="sm"
+                className="h-12 w-full rounded-xl border-dashed bg-transparent text-base font-medium"
                 onClick={() =>
                   updateContent({
                     education: [...content.education, blankEducation()],
@@ -688,15 +926,13 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               {content.education.map((education) => (
                 <div
                   key={education.id}
-                  className="space-y-4 rounded-xl border bg-muted/20 p-4"
+                  className="space-y-5 border-b pb-8 last:border-b-0 last:pb-0"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <strong className="truncate text-sm">
-                      {education.degree}
-                    </strong>
+                  <div className="flex justify-end">
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
                       aria-label={`Remove ${education.degree}`}
                       onClick={() =>
                         updateContent({
@@ -706,58 +942,93 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                         })
                       }
                     >
-                      <Trash2 />
+                      Delete <Trash2 data-icon="inline-end" />
                     </Button>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormField label="Degree or programme">
+                  <div className="space-y-4">
+                    <label className="block">
+                      <span className="sr-only">University/School</span>
                       <Input
-                        value={education.degree}
-                        onChange={(event) =>
-                          updateEducation(education.id, {
-                            degree: event.target.value,
-                          })
-                        }
-                      />
-                    </FormField>
-                    <FormField label="Institution">
-                      <Input
+                        className="h-12 rounded-xl px-4"
                         value={education.institution}
+                        placeholder="University/School"
                         onChange={(event) =>
                           updateEducation(education.id, {
                             institution: event.target.value,
                           })
                         }
                       />
-                    </FormField>
-                    <FormField label="Start date">
+                    </label>
+                    <label className="block">
+                      <span className="sr-only">Degree</span>
                       <Input
+                        className="h-12 rounded-xl px-4"
+                        value={education.degree}
+                        placeholder="Degree (e.g. Bachelor's degree, High school diploma)"
+                        onChange={(event) =>
+                          updateEducation(education.id, {
+                            degree: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="sr-only">Field of Study</span>
+                      <Input
+                        className="h-12 rounded-xl px-4"
+                        value={education.fieldOfStudy ?? ""}
+                        placeholder="Field of Study"
+                        onChange={(event) =>
+                          updateEducation(education.id, {
+                            fieldOfStudy: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="sr-only">Relevant URL (Optional)</span>
+                      <Input
+                        className="h-12 rounded-xl px-4"
+                        type="url"
+                        value={education.url ?? ""}
+                        placeholder="Relevant URL (Optional)"
+                        onChange={(event) =>
+                          updateEducation(education.id, {
+                            url: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="grid gap-4 pt-1 sm:grid-cols-2">
+                      <EducationDateField
+                        label="Start date"
                         value={education.startDate}
-                        placeholder="09/2022"
-                        onChange={(event) =>
-                          updateEducation(education.id, {
-                            startDate: event.target.value,
-                          })
+                        onChange={(startDate) =>
+                          updateEducation(education.id, { startDate })
                         }
                       />
-                    </FormField>
-                    <EndDateField
-                      value={education.endDate}
-                      onChange={(endDate) =>
-                        updateEducation(education.id, { endDate })
-                      }
-                    />
-                    <FormField label="Details" className="sm:col-span-2">
-                      <Input
+                      <EducationDateField
+                        label="End date"
+                        value={education.endDate}
+                        allowPresent
+                        onChange={(endDate) =>
+                          updateEducation(education.id, { endDate })
+                        }
+                      />
+                    </div>
+                    <label className="block">
+                      <span className="sr-only">Achievements</span>
+                      <FormattingTextarea
                         value={education.details}
-                        placeholder="Bachelor's Degree (GPA: 3.72/4.00)"
-                        onChange={(event) =>
+                        placeholder="Achievements"
+                        rows={6}
+                        onChange={(details) =>
                           updateEducation(education.id, {
-                            details: event.target.value,
+                            details,
                           })
                         }
                       />
-                    </FormField>
+                    </label>
                   </div>
                 </div>
               ))}
@@ -776,15 +1047,14 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             onToggleVisibility={() => toggleSectionVisibility("skills")}
           >
             <div>
-              <Textarea
-                aria-label="Skills"
+              <FormattingTextarea
                 value={skillsText}
-                placeholder="One skill per line"
+                placeholder="Add skills, then use the list button for bullets"
                 rows={6}
-                onChange={(event) => {
-                  setSkillsText(event.target.value)
+                onChange={(value) => {
+                  setSkillsText(value)
                   updateContent({
-                    skills: event.target.value
+                    skills: value
                       .split("\n")
                       .map((item) => item.trim())
                       .filter(Boolean),
@@ -795,11 +1065,11 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
           </EditorSection>
         </div>
 
-        <aside className="min-w-0 lg:sticky lg:top-22 lg:self-start">
+        <aside className="min-w-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
           <p className="mb-3 text-sm font-medium text-muted-foreground">
             Live preview
           </p>
-          <div className="flex min-h-[calc(100dvh-9.75rem)] justify-center overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 dark:bg-slate-900">
+          <div className="preview-scroll flex min-h-[calc(100dvh-9.75rem)] justify-center overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 lg:min-h-0 lg:flex-1 dark:bg-slate-900">
             <CvPreview content={content} />
           </div>
         </aside>

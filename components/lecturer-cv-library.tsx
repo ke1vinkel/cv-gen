@@ -51,7 +51,11 @@ export function LecturerCvLibrary({ cvs }: { cvs: StudentCvRecord[] }) {
         const student = studentCvs[0].student
 
         return (
-          <section key={student.id} aria-labelledby={`student-${student.id}`}>
+          <section
+            key={student.id}
+            className="ui-stagger-item"
+            aria-labelledby={`student-${student.id}`}
+          >
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b pb-4">
               <div>
                 <h2
@@ -71,7 +75,10 @@ export function LecturerCvLibrary({ cvs }: { cvs: StudentCvRecord[] }) {
 
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),22rem))] gap-5 xl:gap-6">
               {studentCvs.map((cv) => (
-                <Card key={cv.id} className="gap-4 shadow-none">
+                <Card
+                  key={cv.id}
+                  className="ui-stagger-item gap-4 shadow-none transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_35px_rgba(15,23,42,0.06)]"
+                >
                   <CardHeader>
                     <CardTitle className="truncate">{cv.title}</CardTitle>
                   </CardHeader>

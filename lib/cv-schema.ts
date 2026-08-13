@@ -16,6 +16,8 @@ export const educationSchema = z.object({
   id: z.string().min(1),
   degree: requiredText,
   institution: requiredText,
+  fieldOfStudy: optionalText.optional(),
+  url: optionalText.optional(),
   startDate: optionalText,
   endDate: optionalText,
   details: optionalText,

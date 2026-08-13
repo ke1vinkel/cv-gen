@@ -68,7 +68,7 @@ export function AuthForm() {
 
       {error && (
         <p
-          className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="animate-in rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive duration-200 fade-in slide-in-from-top-1"
           role="alert"
         >
           {error}

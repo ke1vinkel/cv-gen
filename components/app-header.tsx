@@ -6,9 +6,11 @@ import { ThemeToggle } from "@/components/theme-toggle"
 
 export function AppHeader({
   name,
+  role,
   navigationLabel = "My CVs",
 }: {
   name: string
+  role: "student" | "lecturer"
   navigationLabel?: string
 }) {
   return (
@@ -24,8 +26,8 @@ export function AppHeader({
           </Link>
         </div>
         <div className="flex items-center gap-1">
-          <span className="hidden max-w-48 truncate px-2 text-xs text-muted-foreground md:block">
-            {name}
+          <span className="hidden max-w-64 truncate px-2 text-xs text-muted-foreground md:block">
+            {name} | {role === "lecturer" ? "Lecturer" : "Student"}
           </span>
           <ThemeToggle />
           <LogoutButton />
