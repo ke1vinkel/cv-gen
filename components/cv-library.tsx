@@ -1,6 +1,15 @@
 "use client"
 
-import { Copy, Download, FileText, Pencil, Plus, Trash2 } from "lucide-react"
+import {
+  Copy,
+  Download,
+  FileText,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  X,
+} from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
@@ -86,6 +95,17 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
   const [pending, setPending] = useState(false)
   const [pendingAction, setPendingAction] = useState("")
   const [error, setError] = useState("")
+  const [deletedCv, setDeletedCv] = useState<{
+    cv: CvRecord
+    index: number
+  } | null>(null)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    }
+  }, [])
 
   async function create() {
     setPending(true)
@@ -108,13 +128,51 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
   }
 
   async function remove(id: string) {
+    const index = cvs.findIndex((cv) => cv.id === id)
+    const cv = cvs[index]
+    if (!cv) return
+
     setPendingAction(`delete-${id}`)
     setError("")
     const response = await fetch(`/api/cvs/${id}`, { method: "DELETE" })
     if (response.ok) {
       setCvs((items) => items.filter((item) => item.id !== id))
+      setDeletedCv({ cv, index })
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+      undoTimerRef.current = setTimeout(() => setDeletedCv(null), 6000)
     } else {
       setError(t("Could not delete the CV."))
+    }
+    setPendingAction("")
+  }
+
+  async function undoDelete() {
+    if (!deletedCv) return
+
+    const { cv, index } = deletedCv
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    setPendingAction(`restore-${cv.id}`)
+
+    const response = await fetch(`/api/cvs/${cv.id}/restore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: cv.title,
+        content: cv.content,
+        createdAt: cv.createdAt,
+        updatedAt: cv.updatedAt,
+      }),
+    })
+
+    if (response.ok) {
+      setCvs((items) => {
+        const restored = [...items]
+        restored.splice(Math.min(index, restored.length), 0, cv)
+        return restored
+      })
+      setDeletedCv(null)
+    } else {
+      setError(t("Could not restore the CV."))
     }
     setPendingAction("")
   }
@@ -160,7 +218,6 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
               disabled={pending}
               aria-label={t(pending ? "Creating CV" : "Create a new CV")}
               title={t("Create a new CV")}
-              className="shadow-[0_6px_18px_rgba(15,92,145,0.2)]"
             >
               <Plus className="size-5" />
             </Button>
@@ -241,7 +298,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="w-full justify-start"
+                              className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
                               disabled={pendingAction === `delete-${cv.id}`}
                             />
                           }
@@ -256,7 +313,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                             </AlertDialogTitle>
                             <AlertDialogDescription>
                               {t(
-                                "This permanently removes {{title}}. This action cannot be undone.",
+                                "This removes {{title}}. You can undo it briefly after deletion.",
                                 { title: cv.title }
                               )}
                             </AlertDialogDescription>
@@ -292,6 +349,36 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
           </>
         )}
       </section>
+      {deletedCv && (
+        <div
+          className="fixed right-4 bottom-4 left-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border bg-popover p-3 pl-4 text-popover-foreground shadow-xl sm:left-auto sm:mx-0"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="min-w-0 flex-1 truncate text-sm">
+            {t("{{title}} was deleted", { title: deletedCv.cv.title })}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={undoDelete}
+            disabled={pendingAction === `restore-${deletedCv.cv.id}`}
+          >
+            <RotateCcw data-icon="inline-start" />
+            {t("Undo")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setDeletedCv(null)}
+            aria-label={t("Dismiss")}
+          >
+            <X />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

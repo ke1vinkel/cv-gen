@@ -83,7 +83,6 @@ export default async function LoginPage() {
       </section>
 
       <aside className="ui-page-enter ui-page-enter-delayed relative hidden max-h-[100dvh] min-h-[100dvh] overflow-hidden border-l bg-slate-200 lg:block dark:bg-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_44%)]" />
         <div className="login-cv-preview-hitbox absolute top-1/2 left-1/2 w-[794px] -translate-x-1/2 -translate-y-1/2 scale-[0.55] xl:scale-[0.66] 2xl:scale-[0.78]">
           <div className="login-cv-preview rotate-[1.2deg] rounded-2xl border border-slate-300 bg-slate-300 p-5 shadow-[0_36px_90px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-slate-900">
             <CvPreview content={sampleCv} />

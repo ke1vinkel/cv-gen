@@ -198,3 +198,23 @@ export async function deleteCv(userId: string, id: string) {
 
   return result.rowsAffected > 0
 }
+
+export async function restoreCv(userId: string, cv: CvRecord) {
+  await ensureAppSchema()
+
+  await getAppDb().execute({
+    sql: `INSERT INTO cvs
+          (id, user_id, title, content_json, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [
+      cv.id,
+      userId,
+      cv.title,
+      JSON.stringify(cv.content),
+      cv.createdAt,
+      cv.updatedAt,
+    ],
+  })
+
+  return getCv(userId, cv.id)
+}
