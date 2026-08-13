@@ -20,7 +20,9 @@ const idMessages: Record<string, string> = {
   "Please wait": "Mohon tunggu",
   "Sign in": "Masuk",
   "Something went wrong. Try again.": "Terjadi kesalahan. Silakan coba lagi.",
-  "Invalid email or NIM.": "Email atau kata sandi tidak valid.",
+  "Invalid email or password.": "Email atau kata sandi tidak valid.",
+  "Too many sign-in attempts. Try again in 15 minutes.":
+    "Terlalu banyak percobaan masuk. Coba lagi dalam 15 menit.",
   "My CVs": "CV Saya",
   "Student CVs": "CV Mahasiswa",
   "Lecturer": "Dosen",

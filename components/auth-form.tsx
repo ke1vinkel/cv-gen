@@ -26,7 +26,7 @@ export function AuthForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: form.get("email"),
-        nim: form.get("nim"),
+        password: form.get("password"),
       }),
     })
     const data = (await response.json().catch(() => ({}))) as { error?: string }
@@ -42,25 +42,27 @@ export function AuthForm() {
   }
 
   return (
-    <form className="space-y-5" autoComplete="off" onSubmit={submit}>
+    <form className="space-y-5" onSubmit={submit}>
       <div className="space-y-2">
         <Label htmlFor="email">{t("Email")}</Label>
         <Input
           id="email"
           name="email"
           type="email"
+          autoComplete="email"
           placeholder="student@domain.com"
           required
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="nim">{t("Password")}</Label>
+        <Label htmlFor="password">{t("Password")}</Label>
         <Input
-          id="nim"
-          name="nim"
+          id="password"
+          name="password"
           type="password"
+          autoComplete="current-password"
           minLength={1}
-          maxLength={20}
+          maxLength={72}
           placeholder={t("Enter your password")}
           required
         />
