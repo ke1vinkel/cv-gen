@@ -8,7 +8,15 @@ import {
   type CvContent,
   type CvRecord,
 } from "@/lib/cv-schema"
-import { ensureAppSchema, getAppDb } from "@/lib/db"
+import { ensureAppSchema, getAppDb, getAuthDb } from "@/lib/db"
+
+export type StudentCvRecord = CvRecord & {
+  student: {
+    id: string
+    name: string
+    email: string
+  }
+}
 
 function parseCvRow(row: Record<string, unknown>): CvRecord {
   return {
@@ -30,6 +38,81 @@ export async function listCvs(userId: string): Promise<CvRecord[]> {
   })
 
   return result.rows.map((row) => parseCvRow(row as Record<string, unknown>))
+}
+
+export async function listStudentCvs(): Promise<StudentCvRecord[]> {
+  await ensureAppSchema()
+
+  const studentsResult = await getAuthDb().execute({
+    sql: `SELECT DISTINCT users.id, users.name, users.email
+          FROM users
+          JOIN user_roles ON user_roles.user_id = users.id
+          JOIN roles ON roles.id = user_roles.role_id
+          WHERE roles.name = 'student'`,
+    args: [],
+  })
+
+  if (studentsResult.rows.length === 0) return []
+
+  const students = new Map(
+    studentsResult.rows.map((row) => [
+      String(row.id),
+      {
+        id: String(row.id),
+        name: String(row.name),
+        email: String(row.email),
+      },
+    ])
+  )
+  const studentIds = [...students.keys()]
+  const placeholders = studentIds.map(() => "?").join(", ")
+  const result = await getAppDb().execute({
+    sql: `SELECT id, user_id, title, content_json, created_at, updated_at
+          FROM cvs
+          WHERE user_id IN (${placeholders})
+          ORDER BY updated_at DESC`,
+    args: studentIds,
+  })
+
+  return result.rows.map((row) => ({
+    ...parseCvRow(row as Record<string, unknown>),
+    student: students.get(String(row.user_id))!,
+  }))
+}
+
+export async function getStudentCv(
+  id: string
+): Promise<StudentCvRecord | null> {
+  await ensureAppSchema()
+
+  const result = await getAppDb().execute({
+    sql: `SELECT id, user_id, title, content_json, created_at, updated_at
+          FROM cvs WHERE id = ? LIMIT 1`,
+    args: [id],
+  })
+  const row = result.rows[0]
+  if (!row) return null
+
+  const studentResult = await getAuthDb().execute({
+    sql: `SELECT users.id, users.name, users.email
+          FROM users
+          JOIN user_roles ON user_roles.user_id = users.id
+          JOIN roles ON roles.id = user_roles.role_id
+          WHERE users.id = ? AND roles.name = 'student'
+          LIMIT 1`,
+    args: [String(row.user_id)],
+  })
+  const student = studentResult.rows[0]
+  if (!student) return null
+
+  return {
+    ...parseCvRow(row as Record<string, unknown>),
+    student: {
+      id: String(student.id),
+      name: String(student.name),
+      email: String(student.email),
+    },
+  }
 }
 
 export async function getCv(userId: string, id: string) {

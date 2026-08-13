@@ -16,7 +16,16 @@ export async function POST(request: Request) {
   }
 
   const result = await getAuthDb().execute({
-    sql: "SELECT id, nim FROM users WHERE email = ? COLLATE NOCASE LIMIT 1",
+    sql: `SELECT users.id, users.nim
+          FROM users
+          WHERE users.email = ? COLLATE NOCASE
+            AND EXISTS (
+              SELECT 1 FROM user_roles
+              JOIN roles ON roles.id = user_roles.role_id
+              WHERE user_roles.user_id = users.id
+                AND roles.name IN ('student', 'lecturer')
+            )
+          LIMIT 1`,
     args: [parsed.data.email],
   })
   const user = result.rows[0]

@@ -53,25 +53,17 @@ export function AuthForm() {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="nim">Password (NIM)</Label>
+        <Label htmlFor="nim">Password</Label>
         <Input
           id="nim"
           name="nim"
           type="password"
-          inputMode="numeric"
           autoComplete="current-password"
-          pattern="[0-9]{6,20}"
-          placeholder="Enter your Password"
-          aria-describedby="nim-help"
+          minLength={1}
+          maxLength={20}
+          placeholder="Enter your password"
           required
         />
-        <p
-          id="nim-help"
-          className="text-xs leading-relaxed text-muted-foreground"
-        >
-          Your NIM is protected like a password and stored only as a secure
-          hash.
-        </p>
       </div>
 
       {error && (

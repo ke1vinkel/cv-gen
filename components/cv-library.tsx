@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils"
 const CV_WIDTH = 794
 const CV_HEIGHT = 1123
 
-function CvThumbnail({ cv }: { cv: CvRecord }) {
+export function CvThumbnail({ cv }: { cv: CvRecord }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.31)
 

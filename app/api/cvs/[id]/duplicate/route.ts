@@ -10,6 +10,9 @@ export async function POST(
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
+  if (user.role !== "student") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   const { id } = await context.params
   const cv = await duplicateCv(user.id, id)

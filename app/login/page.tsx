@@ -64,7 +64,8 @@ export default async function LoginPage() {
             Sign in to CV Gen
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Use your assigned university email and NIM to continue.
+            Student and lecturer accounts can continue with their assigned
+            university email and password.
           </p>
           <div className="mt-8">
             <AuthForm />

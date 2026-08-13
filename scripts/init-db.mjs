@@ -13,20 +13,13 @@ const app = createClient({
 
 await app.batch(
   [
-    `CREATE TABLE IF NOT EXISTS cv_users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      nim_hash TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    )`,
-    `CREATE TABLE IF NOT EXISTS cv_sessions (
+    `CREATE TABLE IF NOT EXISTS app_sessions (
       token_hash TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES cv_users(id) ON DELETE CASCADE
+      created_at TEXT NOT NULL
     )`,
-    "CREATE INDEX IF NOT EXISTS cv_sessions_user_id_idx ON cv_sessions(user_id)",
+    "CREATE INDEX IF NOT EXISTS app_sessions_user_id_idx ON app_sessions(user_id)",
     `CREATE TABLE IF NOT EXISTS cvs (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,

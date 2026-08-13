@@ -13,6 +13,9 @@ export async function GET() {
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
+  if (user.role !== "student") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   return Response.json({ cvs: await listCvs(user.id) })
 }
@@ -22,6 +25,9 @@ export async function POST(request: Request) {
 
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (user.role !== "student") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
   }
 
   const parsed = createSchema.safeParse(await request.json())

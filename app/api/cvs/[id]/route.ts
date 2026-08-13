@@ -11,6 +11,9 @@ export async function GET(
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
+  if (user.role !== "student") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   const { id } = await context.params
   const cv = await getCv(user.id, id)
@@ -30,6 +33,9 @@ export async function PATCH(
 
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (user.role !== "student") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
   }
 
   const parsed = cvMutationSchema.safeParse(await request.json())
@@ -59,6 +65,9 @@ export async function DELETE(
 
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (user.role !== "student") {
+    return Response.json({ error: "Forbidden" }, { status: 403 })
   }
 
   const { id } = await context.params
