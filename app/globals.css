@@ -506,7 +506,7 @@ body {
 }
 
 /* Mobile bottom bar safe area */
-@media (max-width: 1023px) {
+@media screen and (max-width: 1023px) {
   main {
     padding-bottom: 64px;
   }
@@ -523,13 +523,15 @@ body {
   }
 
   .cv-page-frame {
-    width: 210mm;
-    height: 297mm;
+    width: 210mm !important;
+    height: 297mm !important;
     break-after: page;
+    page-break-after: always;
   }
 
   .cv-page-frame:last-child {
     break-after: auto;
+    page-break-after: auto;
   }
 
   .cv-paper {
