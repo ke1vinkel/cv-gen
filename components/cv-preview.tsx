@@ -16,7 +16,9 @@ import { cn } from "@/lib/utils"
 
 const A4_WIDTH = 794
 const A4_HEIGHT = 1123
-const A4_CONTENT_HEIGHT = A4_HEIGHT - 116
+const A4_PAGE_PADDING = 116
+const A4_BOTTOM_SAFETY = 24
+const A4_CONTENT_HEIGHT = A4_HEIGHT - A4_PAGE_PADDING - A4_BOTTOM_SAFETY
 
 function dateSortValue(value: string) {
   const normalized = value.trim().toLowerCase()
@@ -422,27 +424,38 @@ export function CvPreview({
   }, [])
 
   useLayoutEffect(() => {
-    const measuredBlocks =
-      measurementRef.current?.querySelectorAll("[data-cv-block]")
-    if (!measuredBlocks) return
+    const measurement = measurementRef.current
+    if (!measurement) return
 
-    const nextPages: number[][] = [[]]
-    let usedHeight = 0
+    const paginate = () => {
+      const measuredBlocks = measurement.querySelectorAll("[data-cv-block]")
+      const nextPages: number[][] = [[]]
+      let usedHeight = 0
 
-    measuredBlocks.forEach((block, index) => {
-      const height = block.getBoundingClientRect().height
-      const currentPage = nextPages[nextPages.length - 1]
+      measuredBlocks.forEach((block, index) => {
+        const height = block.getBoundingClientRect().height
+        const currentPage = nextPages[nextPages.length - 1]
 
-      if (currentPage.length > 0 && usedHeight + height > A4_CONTENT_HEIGHT) {
-        nextPages.push([index])
-        usedHeight = height
-      } else {
-        currentPage.push(index)
-        usedHeight += height
-      }
-    })
+        if (
+          currentPage.length > 0 &&
+          usedHeight + height > A4_CONTENT_HEIGHT
+        ) {
+          nextPages.push([index])
+          usedHeight = height
+        } else {
+          currentPage.push(index)
+          usedHeight += height
+        }
+      })
 
-    setPages(nextPages)
+      setPages(nextPages)
+    }
+
+    const observer = new ResizeObserver(paginate)
+    observer.observe(measurement)
+    paginate()
+
+    return () => observer.disconnect()
   }, [blocks])
 
   return (

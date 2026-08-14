@@ -21,7 +21,7 @@ export default async function DashboardPage() {
     const studentCount = new Set(cvs.map((cv) => cv.student.id)).size
 
     return (
-      <div className="min-h-[100dvh] bg-muted/20">
+      <div className="min-h-[100dvh] bg-muted/30">
         <AppHeader
           name={user.name}
           role={user.role}
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
   const cvs = await listCvs(user.id)
 
   return (
-    <div className="min-h-[100dvh] bg-muted/20">
+    <div className="min-h-[100dvh] bg-muted/30">
       <AppHeader name={user.name} role={user.role} />
       <main className="ui-page-enter w-full px-4 py-8 sm:px-6 sm:py-10 lg:px-10 xl:px-14 2xl:px-16">
         <div className="mb-8 max-w-2xl sm:mb-10">

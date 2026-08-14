@@ -3,6 +3,7 @@
 import {
   Copy,
   Download,
+  EllipsisVertical,
   FileText,
   Pencil,
   Plus,
@@ -35,6 +36,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { CvRecord } from "@/lib/cv-schema"
 import { cn } from "@/lib/utils"
 
@@ -95,6 +102,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
   const [pending, setPending] = useState(false)
   const [pendingAction, setPendingAction] = useState("")
   const [error, setError] = useState("")
+  const [deleteCandidate, setDeleteCandidate] = useState<CvRecord | null>(null)
   const [deletedCv, setDeletedCv] = useState<{
     cv: CvRecord
     index: number
@@ -240,7 +248,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
           </section>
         ) : (
           <>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),23rem))] gap-5 xl:gap-6">
+            <div className="grid grid-cols-[minmax(0,17rem)] justify-center gap-5 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),23rem))] sm:justify-start xl:gap-6">
               {cvs.map((cv) => (
                 <Card
                   key={cv.id}
@@ -249,10 +257,64 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                   <CardHeader>
                     <CardTitle className="truncate pr-8">{cv.title}</CardTitle>
                     <CardAction>
+                      <div className="sm:hidden">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={t("Actions for {{title}}", {
+                                  title: cv.title,
+                                })}
+                              />
+                            }
+                          >
+                            <EllipsisVertical />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-44">
+                            <DropdownMenuItem
+                              render={<Link href={`/cvs/${cv.id}/edit`} />}
+                            >
+                              <Pencil />
+                              {t("Edit")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => duplicate(cv.id)}
+                              disabled={pendingAction === `duplicate-${cv.id}`}
+                            >
+                              <Copy />
+                              {pendingAction === `duplicate-${cv.id}`
+                                ? t("Duplicating...")
+                                : t("Duplicate")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setDeleteCandidate(cv)}
+                            >
+                              <Trash2 />
+                              {t("Delete")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              render={
+                                <Link
+                                  href={`/cvs/${cv.id}/preview`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                />
+                              }
+                            >
+                              <Download />
+                              {t("Download")}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                       <Link
                         href={`/cvs/${cv.id}/edit`}
                         className={cn(
-                          buttonVariants({ variant: "ghost", size: "icon-sm" })
+                          buttonVariants({ variant: "ghost", size: "icon-sm" }),
+                          "hidden sm:inline-flex"
                         )}
                         aria-label={t("Edit {{title}}", { title: cv.title })}
                       >
@@ -269,7 +331,7 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                         })}
                       </span>
                     </div>
-                    <div className="grid gap-1 border-t pt-3">
+                    <div className="hidden gap-1 border-t pt-3 sm:grid">
                       <Link
                         href={`/cvs/${cv.id}/edit`}
                         className={cn(
@@ -349,6 +411,38 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
           </>
         )}
       </section>
+      <AlertDialog
+        open={deleteCandidate !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteCandidate(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Delete this CV?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteCandidate
+                ? t(
+                    "This removes {{title}}. You can undo it briefly after deletion.",
+                    { title: deleteCandidate.title }
+                  )
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (deleteCandidate) remove(deleteCandidate.id)
+                setDeleteCandidate(null)
+              }}
+            >
+              {t("Delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {deletedCv && (
         <div
           className="fixed right-4 bottom-4 left-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border bg-popover p-3 pl-4 text-popover-foreground shadow-xl sm:left-auto sm:mx-0"

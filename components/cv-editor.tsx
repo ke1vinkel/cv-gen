@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Download,
   Eye,
   EyeOff,
   GraduationCap,
@@ -18,6 +19,8 @@ import {
   List,
   ListIcon,
   LoaderCircle,
+  Maximize2,
+  Minimize2,
   Pencil,
   Plus,
   Save,
@@ -927,6 +930,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
   const isDirtyRef = useRef(false)
   const hasHistoryGuard = useRef(false)
   const [mobileView, setMobileView] = useState<MobileView>("edit")
+  const [fitMobilePreview, setFitMobilePreview] = useState(false)
   const [splitPercent, setSplitPercent] = useState(36)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -1885,9 +1889,54 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
             <p className="text-sm font-medium text-muted-foreground">
               {t("Live preview")}
             </p>
+            <div className="flex items-center gap-1 lg:hidden">
+              <Link
+                href={`/cvs/${initialCv.id}/preview`}
+                aria-disabled={isDirty}
+                onNavigate={(event) => {
+                  if (!isDirty) return
+
+                  event.preventDefault()
+                  setMessage(t("Save your changes before leaving."))
+                }}
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "sm" }),
+                  isDirty && "cursor-not-allowed opacity-60"
+                )}
+              >
+                <Download data-icon="inline-start" />
+                {t("Download")}
+              </Link>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setFitMobilePreview((current) => !current)}
+                aria-pressed={fitMobilePreview}
+              >
+                {fitMobilePreview ? (
+                  <Maximize2 data-icon="inline-start" />
+                ) : (
+                  <Minimize2 data-icon="inline-start" />
+                )}
+                {t(fitMobilePreview ? "Readable size" : "Fit page")}
+              </Button>
+            </div>
           </div>
-          <div className="preview-scroll flex min-h-[calc(100dvh-9.75rem)] justify-center overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 lg:min-h-0 lg:flex-1 dark:bg-slate-900">
-            <CvPreview content={content} />
+          <div
+            className={cn(
+              "preview-scroll flex min-h-[calc(100dvh-9.75rem)] overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 lg:min-h-0 lg:flex-1 lg:justify-center dark:bg-slate-900",
+              fitMobilePreview && "justify-center"
+            )}
+          >
+            <div
+              className={cn(
+                "w-full lg:min-w-0",
+                !fitMobilePreview && "min-w-[40rem]"
+              )}
+            >
+              <CvPreview content={content} />
+            </div>
           </div>
         </aside>
       </main>
