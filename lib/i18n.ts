@@ -14,6 +14,11 @@ const idMessages: Record<string, string> = {
   "Internal access": "Akses internal",
   "Sign in to CV Gen": "Masuk ke CV Gen",
   "Accounts are managed internally.": "Akun dikelola secara internal.",
+  "CV preview": "Pratinjau CV",
+  "Professional template": "Templat profesional",
+  "One page": "Satu halaman",
+  "Build a focused CV with clear structure and measurable impact.":
+    "Buat CV yang fokus dengan struktur jelas dan dampak terukur.",
   "Email": "Email",
   "Password": "Kata sandi",
   "Enter your password": "Masukkan kata sandi",
@@ -196,6 +201,51 @@ const idMessages: Record<string, string> = {
   "Edit form": "Edit formulir",
   "Remove section": "Hapus bagian",
   "Remove {{section}}": "Hapus {{section}}",
+  "Needs work": "Perlu perbaikan",
+  "Developing": "Berkembang",
+  "Strong": "Kuat",
+  "Completeness": "Kelengkapan",
+  "Bullet Quality": "Kualitas Poin",
+  "Summary Quality": "Kualitas Ringkasan",
+  "Contact Validation": "Validasi Kontak",
+  "Score": "Skor",
+  "CV Quality Score": "Skor Kualitas CV",
+  "Not scored": "Belum dinilai",
+  "Recheck": "Periksa ulang",
+  "Rechecking…": "Memeriksa ulang…",
+  "Updating…": "Memperbarui…",
+  "View checks": "Lihat pemeriksaan",
+  "Scored on {{date}}": "Dinilai pada {{date}}",
+  "Could not save. Score shown locally.":
+    "Tidak dapat menyimpan. Skor ditampilkan secara lokal.",
+  "Scored with an older version. The student's next save will update this score.":
+    "Dinilai dengan versi lama. Simpan berikutnya dari mahasiswa akan memperbarui skor ini.",
+  "This CV has not been scored yet.": "CV ini belum dinilai.",
+  "Phone number is missing": "Nomor telepon tidak diisi",
+  "Email address is missing": "Alamat email tidak diisi",
+  "Email address is not valid": "Alamat email tidak valid",
+  "Summary is missing": "Ringkasan tidak diisi",
+  "No work experience added": "Belum ada pengalaman kerja",
+  "No education entry added": "Belum ada riwayat pendidikan",
+  "Name is missing": "Nama tidak diisi",
+  "Bullet does not start with an action verb":
+    "Poin tidak dimulai dengan kata kerja aksi",
+  "Bullet is too short (less than 8 words)":
+    "Poin terlalu pendek (kurang dari 8 kata)",
+  "Consider adding metrics to this bullet":
+    "Pertimbangkan menambahkan angka pada poin ini",
+  "Summary is too short (minimum 30 words)":
+    "Ringkasan terlalu pendek (minimal 30 kata)",
+  "Summary is too long (maximum 200 words)":
+    "Ringkasan terlalu panjang (maksimal 200 kata)",
+  "Summary contains generic filler phrases": "Ringkasan mengandung frasa umum",
+  "Phone number may be missing country code":
+    "Nomor telepon mungkin tidak memiliki kode negara",
+  "Website URL is not valid": "URL situs web tidak valid",
+  "CV has very few entries — consider adding more experience or skills":
+    "CV memiliki sangat sedikit isian — pertimbangkan menambahkan pengalaman atau keahlian",
+  "Estimated content may exceed two pages":
+    "Perkiraan konten mungkin melebihi dua halaman",
 }
 
 export function isLocale(value: string | undefined): value is Locale {

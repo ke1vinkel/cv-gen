@@ -338,7 +338,7 @@ function buildBlocks(content: CvContent, t: Translator): ReactNode[] {
             <h2>{t("Skills")}</h2>
             <ul className="cv-skills">
               {content.skills.map((skill) => (
-                <li key={skill}>{skill}</li>
+                <li key={skill}>{renderInlineMarkdown(skill)}</li>
               ))}
             </ul>
           </section>

@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import type { AtsCategoryResult } from "@/lib/ats-scoring"
+
 const requiredText = z.string().trim().min(1).max(200)
 const optionalText = z.string().trim().max(500)
 const optionalUrl = z
@@ -131,6 +133,10 @@ export type CvRecord = {
   id: string
   title: string
   content: CvContent
+  atsScore: number | null
+  atsBreakdown: AtsCategoryResult[] | null
+  atsScoringVersion: number | null
+  atsScoredAt: string | null
   createdAt: string
   updatedAt: string
 }

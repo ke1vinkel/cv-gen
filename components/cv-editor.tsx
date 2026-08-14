@@ -6,6 +6,7 @@ import {
   Bold,
   BriefcaseBusiness,
   Check,
+  ClipboardCheck,
   ChevronDown,
   ChevronRight,
   Download,
@@ -42,6 +43,7 @@ import {
 } from "react"
 
 import { CvPreview } from "@/components/cv-preview"
+import { AtsScorePanel } from "@/components/ats-score-panel"
 import { LanguageToggle } from "@/components/language-toggle"
 import { useLanguage } from "@/components/language-provider"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -76,7 +78,8 @@ type SectionKey =
   | "education"
   | "skills"
   | "languages"
-type MobileView = "edit" | "preview"
+type MobileView = "edit" | "preview" | "score"
+type RightPane = "preview" | "score"
 
 const languageProficiencies: Language["proficiency"][] = [
   "Not Rated",
@@ -140,7 +143,83 @@ function ResizeHandle({
   )
 }
 
-// ─── Formatting Textarea ───────────────────────────────────────────
+// ─── Rich-text editor ──────────────────────────────────────────────
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+}
+
+function inlineMarkdownToHtml(value: string) {
+  return escapeHtml(value)
+    .replace(/\[([^\]]+)]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_]+)__/g, "<u>$1</u>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+}
+
+function markdownToEditorHtml(value: string) {
+  const lines = value.split("\n")
+  const html: string[] = []
+  let bullets: string[] = []
+
+  function flushBullets() {
+    if (!bullets.length) return
+    html.push(`<ul>${bullets.map((line) => `<li>${inlineMarkdownToHtml(line)}</li>`).join("")}</ul>`)
+    bullets = []
+  }
+
+  for (const line of lines) {
+    if (line.startsWith("• ")) {
+      bullets.push(line.slice(2))
+    } else {
+      flushBullets()
+      html.push(line ? `<div>${inlineMarkdownToHtml(line)}</div>` : "<div><br></div>")
+    }
+  }
+  flushBullets()
+  return html.join("")
+}
+
+function editorNodeToMarkdown(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+  if (!(node instanceof HTMLElement)) return ""
+
+  const content = Array.from(node.childNodes).map(editorNodeToMarkdown).join("")
+  switch (node.tagName) {
+    case "STRONG":
+    case "B":
+      return `**${content}**`
+    case "EM":
+    case "I":
+      return `*${content}*`
+    case "U":
+      return `__${content}__`
+    case "A": {
+      const href = node.getAttribute("href")
+      return href ? `[${content}](${href})` : content
+    }
+    case "LI":
+      return `• ${content}\n`
+    case "DIV":
+    case "P":
+      return `${content}\n`
+    case "BR":
+      return "\n"
+    default:
+      return content
+  }
+}
+
+function editorToMarkdown(editor: HTMLElement) {
+  return Array.from(editor.childNodes)
+    .map(editorNodeToMarkdown)
+    .join("")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\n$/, "")
+}
 
 function FormattingTextarea({
   value,
@@ -153,118 +232,77 @@ function FormattingTextarea({
   placeholder: string
   rows?: number
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null)
+  const ref = useRef<HTMLDivElement>(null)
+  const [initialHtml] = useState(() => markdownToEditorHtml(value))
+  const lastValueRef = useRef(value)
+  const selectionRef = useRef<Range | null>(null)
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    list: false,
+  })
   const { t } = useLanguage()
 
-  function replaceSelection(prefix: string, suffix = prefix) {
-    const textarea = ref.current
-    if (!textarea) return
+  const setEditorRef = useCallback((editor: HTMLDivElement | null) => {
+    ref.current = editor
+    if (editor) editor.innerHTML = initialHtml
+  }, [initialHtml])
 
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selected = value.slice(start, end) || "text"
-    const next = `${value.slice(0, start)}${prefix}${selected}${suffix}${value.slice(end)}`
+  useEffect(() => {
+    const editor = ref.current
+    if (!editor || value === lastValueRef.current) return
+    editor.innerHTML = markdownToEditorHtml(value)
+    lastValueRef.current = value
+  }, [value])
+
+  function updateActiveFormats() {
+    const editor = ref.current
+    const selection = window.getSelection()
+    if (!editor || !selection?.anchorNode || !editor.contains(selection.anchorNode)) return
+    if (selection.rangeCount) selectionRef.current = selection.getRangeAt(0).cloneRange()
+    setActiveFormats({
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      underline: document.queryCommandState("underline"),
+      list: document.queryCommandState("insertUnorderedList"),
+    })
+  }
+
+  function emitChange() {
+    const editor = ref.current
+    if (!editor) return
+    const next = editorToMarkdown(editor)
+    lastValueRef.current = next
     onChange(next)
-    requestAnimationFrame(() => {
-      textarea.focus()
-      textarea.setSelectionRange(
-        start + prefix.length,
-        start + prefix.length + selected.length
-      )
-    })
+    updateActiveFormats()
   }
 
-  function toggleList() {
-    const textarea = ref.current
-    if (!textarea) return
+  function runCommand(command: string, commandValue?: string) {
+    const editor = ref.current
+    if (!editor) return
+    const selection = window.getSelection()
+    const selectionIsInEditor = Boolean(
+      selection?.anchorNode && editor.contains(selection.anchorNode)
+    )
 
-    const start = value.lastIndexOf("\n", textarea.selectionStart - 1) + 1
-    const nextBreak = value.indexOf("\n", textarea.selectionEnd)
-    const end = nextBreak === -1 ? value.length : nextBreak
-    const selectionStart = textarea.selectionStart
-    const selectionEnd = textarea.selectionEnd
-    const lines = value.slice(start, end).split("\n")
-    const remove = lines.every((line) => line.startsWith("• "))
-    const replacement = lines
-      .map((line) => (remove ? line.slice(2) : `• ${line}`))
-      .join("\n")
-    onChange(`${value.slice(0, start)}${replacement}${value.slice(end)}`)
-    const nextSelectionStart = remove
-      ? Math.max(start, selectionStart - 2)
-      : selectionStart + 2
-    const nextSelectionEnd = remove
-      ? Math.max(start, selectionEnd - 2 * lines.length)
-      : selectionEnd + 2 * lines.length
-    requestAnimationFrame(() => {
-      textarea.focus()
-      textarea.setSelectionRange(nextSelectionStart, nextSelectionEnd)
-    })
+    if (!selectionIsInEditor) {
+      editor.focus()
+    }
+    if (!selectionIsInEditor && selectionRef.current) {
+      selection?.removeAllRanges()
+      selection?.addRange(selectionRef.current)
+    }
+    document.execCommand(command, false, commandValue)
+    emitChange()
   }
 
-  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    const textarea = event.currentTarget
-    const lineStart = value.lastIndexOf("\n", textarea.selectionStart - 1) + 1
-    const beforeCaret = value.slice(lineStart, textarea.selectionStart)
-
-    // Keyboard shortcuts: Ctrl/Cmd + B/I/U
-    if (event.ctrlKey || event.metaKey) {
-      if (event.key === "b") {
-        event.preventDefault()
-        replaceSelection("**")
-        return
-      }
-      if (event.key === "i") {
-        event.preventDefault()
-        replaceSelection("*")
-        return
-      }
-      if (event.key === "u") {
-        event.preventDefault()
-        replaceSelection("__")
-        return
-      }
-    }
-
-    if (event.key === "Enter" && beforeCaret.startsWith("• ")) {
-      event.preventDefault()
-
-      if (beforeCaret === "• ") {
-        const next = `${value.slice(0, lineStart)}${value.slice(textarea.selectionEnd)}`
-        onChange(next)
-        requestAnimationFrame(() => {
-          textarea.focus()
-          textarea.setSelectionRange(lineStart, lineStart)
-        })
-        return
-      }
-
-      const insertion = "\n• "
-      const nextCaret = textarea.selectionStart + insertion.length
-      onChange(
-        `${value.slice(0, textarea.selectionStart)}${insertion}${value.slice(textarea.selectionEnd)}`
-      )
-      requestAnimationFrame(() => {
-        textarea.focus()
-        textarea.setSelectionRange(nextCaret, nextCaret)
-      })
-    }
-
-    if (
-      event.key === "Backspace" &&
-      textarea.selectionStart === textarea.selectionEnd &&
-      beforeCaret === "• "
-    ) {
-      event.preventDefault()
-      const next = `${value.slice(0, lineStart)}${value.slice(textarea.selectionStart)}`
-      onChange(next)
-      requestAnimationFrame(() => {
-        textarea.focus()
-        textarea.setSelectionRange(lineStart, lineStart)
-      })
-    }
+  function addLink() {
+    const url = window.prompt(t("Enter link URL"), "https://")
+    if (url && /^https?:\/\//i.test(url)) runCommand("createLink", url)
   }
 
-  const toolClass = "size-9 rounded-lg"
+  const toolClass = "size-9 rounded-lg data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
 
   return (
     <div className="overflow-hidden rounded-xl bg-input/50 focus-within:ring-3 focus-within:ring-ring/30">
@@ -274,7 +312,10 @@ function FormattingTextarea({
           variant="ghost"
           size="icon"
           className={toolClass}
-          onClick={() => replaceSelection("**")}
+          data-active={activeFormats.bold}
+          aria-pressed={activeFormats.bold}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => runCommand("bold")}
           aria-label={t("Bold")}
         >
           <Bold />
@@ -284,7 +325,10 @@ function FormattingTextarea({
           variant="ghost"
           size="icon"
           className={toolClass}
-          onClick={() => replaceSelection("*")}
+          data-active={activeFormats.italic}
+          aria-pressed={activeFormats.italic}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => runCommand("italic")}
           aria-label={t("Italic")}
         >
           <Italic />
@@ -294,7 +338,10 @@ function FormattingTextarea({
           variant="ghost"
           size="icon"
           className={toolClass}
-          onClick={() => replaceSelection("__")}
+          data-active={activeFormats.underline}
+          aria-pressed={activeFormats.underline}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => runCommand("underline")}
           aria-label={t("Underline")}
         >
           <Underline />
@@ -304,7 +351,8 @@ function FormattingTextarea({
           variant="ghost"
           size="icon"
           className={toolClass}
-          onClick={() => replaceSelection("[", "](https://)")}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={addLink}
           aria-label={t("Add link")}
         >
           <Link2 />
@@ -314,7 +362,10 @@ function FormattingTextarea({
           variant="ghost"
           size="icon"
           className={toolClass}
-          onClick={toggleList}
+          data-active={activeFormats.list}
+          aria-pressed={activeFormats.list}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => runCommand("insertUnorderedList")}
           aria-label={t("Toggle bullet list")}
         >
           <ListIcon />
@@ -331,14 +382,19 @@ function FormattingTextarea({
           <AlignLeft />
         </Button>
       </div>
-      <Textarea
-        ref={ref}
-        className="min-h-36 resize-y rounded-none bg-transparent px-4 py-4 focus-visible:border-transparent focus-visible:ring-0"
-        value={value}
-        placeholder={placeholder}
-        rows={rows}
-        onKeyDown={handleKeyDown}
-        onChange={(event) => onChange(event.target.value)}
+      <div
+        ref={setEditorRef}
+        className="min-h-36 resize-y overflow-auto bg-transparent px-4 py-4 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        data-placeholder={placeholder}
+        style={{ minHeight: `${Math.max(rows, 6) * 1.5}rem` }}
+        onInput={emitChange}
+        onKeyUp={updateActiveFormats}
+        onMouseUp={updateActiveFormats}
+        onFocus={updateActiveFormats}
       />
     </div>
   )
@@ -376,6 +432,7 @@ function EditorSection({
   children,
   activeSection,
   visible,
+  completion,
   orderClass,
   onOpen,
   onBack,
@@ -387,6 +444,7 @@ function EditorSection({
   children: React.ReactNode
   activeSection: SectionKey | null
   visible: boolean
+  completion: number
   orderClass: string
   onOpen: () => void
   onBack: () => void
@@ -409,6 +467,9 @@ function EditorSection({
             </span>
             <span className="min-w-0 flex-1 text-lg font-medium tracking-tight">
               {t(title)}
+            </span>
+            <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium tabular-nums text-muted-foreground">
+              {completion}%
             </span>
           </button>
           <button
@@ -898,6 +959,51 @@ const sectionIcons: Record<string, React.ReactNode> = {
   languages: <Languages className="size-5" />,
 }
 
+function percentage(values: boolean[]) {
+  if (values.length === 0) return 0
+  return Math.round((values.filter(Boolean).length / values.length) * 100)
+}
+
+function sectionCompletion(content: CvContent, section: SectionKey) {
+  switch (section) {
+    case "personal":
+      return percentage([
+        Boolean(content.name.trim()),
+        Boolean(content.contact.email.trim()),
+        Boolean(content.contact.phone.trim()),
+      ])
+    case "summary":
+      return content.summary.trim() ? 100 : 0
+    case "experience":
+      return percentage(
+        content.experiences.flatMap((experience) => [
+          Boolean(experience.role.trim()),
+          Boolean(experience.organization.trim()),
+          Boolean(experience.startDate.trim()),
+          Boolean(experience.endDate.trim()),
+        ])
+      )
+    case "education":
+      return percentage(
+        content.education.flatMap((education) => [
+          Boolean(education.degree.trim()),
+          Boolean(education.institution.trim()),
+          Boolean(education.startDate.trim()),
+          Boolean(education.endDate.trim()),
+        ])
+      )
+    case "skills":
+      return content.skills.some((skill) => skill.trim()) ? 100 : 0
+    case "languages":
+      return percentage(
+        content.languages.flatMap((language) => [
+          Boolean(language.language.trim()),
+          language.proficiency !== "Not Rated",
+        ])
+      )
+  }
+}
+
 
 
 // ─── Main Editor ──────────────────────────────────────────────────
@@ -930,6 +1036,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
   const isDirtyRef = useRef(false)
   const hasHistoryGuard = useRef(false)
   const [mobileView, setMobileView] = useState<MobileView>("edit")
+  const [rightPane, setRightPane] = useState<RightPane>("preview")
   const [fitMobilePreview, setFitMobilePreview] = useState(false)
   const [splitPercent, setSplitPercent] = useState(36)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -1086,19 +1193,6 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
     })
   }
 
-  function addCustomSection() {
-    const newSection: CustomSection = {
-      id: crypto.randomUUID(),
-      title: t("New section"),
-      items: [],
-    }
-    const newOrder = [...sectionOrder, newSection.id]
-    updateContent({
-      customSections: [...(content.customSections ?? []), newSection],
-      sectionOrder: newOrder,
-    })
-  }
-
   function removeCustomSection(sectionId: string) {
     updateContent({
       customSections: (content.customSections ?? []).filter(
@@ -1134,6 +1228,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 icon={sectionIcons.personal}
                 activeSection={activeSection}
                 visible={sectionIsVisible("personal")}
+                completion={sectionCompletion(content, "personal")}
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("personal")}
                 onBack={() => setActiveSection(null)}
@@ -1217,6 +1312,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 icon={sectionIcons.summary}
                 activeSection={activeSection}
                 visible={sectionIsVisible("summary")}
+                completion={sectionCompletion(content, "summary")}
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("summary")}
                 onBack={() => setActiveSection(null)}
@@ -1247,6 +1343,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 icon={sectionIcons.experience}
                 activeSection={activeSection}
                 visible={sectionIsVisible("experience")}
+                completion={sectionCompletion(content, "experience")}
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("experience")}
                 onBack={() => setActiveSection(null)}
@@ -1404,6 +1501,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 icon={sectionIcons.education}
                 activeSection={activeSection}
                 visible={sectionIsVisible("education")}
+                completion={sectionCompletion(content, "education")}
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("education")}
                 onBack={() => setActiveSection(null)}
@@ -1566,6 +1664,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 icon={sectionIcons.skills}
                 activeSection={activeSection}
                 visible={sectionIsVisible("skills")}
+                completion={sectionCompletion(content, "skills")}
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("skills")}
                 onBack={() => setActiveSection(null)}
@@ -1600,6 +1699,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 icon={sectionIcons.languages}
                 activeSection={activeSection}
                 visible={sectionIsVisible("languages")}
+                completion={sectionCompletion(content, "languages")}
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("languages")}
                 onBack={() => setActiveSection(null)}
@@ -1817,6 +1917,21 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               <Eye data-icon="inline-start" />
               {t("Preview")}
             </Link>
+            <Button
+              type="button"
+              variant={rightPane === "score" ? "secondary" : "outline"}
+              size="sm"
+              className="hidden lg:inline-flex"
+              onClick={() =>
+                setRightPane((current) =>
+                  current === "score" ? "preview" : "score"
+                )
+              }
+              aria-pressed={rightPane === "score"}
+            >
+              <ClipboardCheck data-icon="inline-start" />
+              {t("Score")}
+            </Button>
             <Button size="sm" onClick={save} disabled={saveState === "saving"}>
               {saveState === "saving" ? (
                 <LoaderCircle
@@ -1848,21 +1963,75 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
         <div
           className={cn(
             "editor-scroll flex flex-col self-start overflow-hidden rounded-2xl border bg-background px-5 shadow-[0_12px_40px_rgba(15,23,42,0.05)] sm:px-7 lg:h-full lg:self-stretch lg:overflow-y-auto",
-            mobileView === "preview" && "hidden lg:flex"
+            mobileView !== "edit" && "hidden lg:flex"
           )}
         >
           {renderSections()}
 
-          {/* Add Custom Section button (only when no section is open) */}
-          {!activeSection && (
-            <div className="border-t py-4">
-              <Button
-                variant="outline"
-                className="h-12 w-full rounded-xl border-dashed bg-transparent text-base hover:border-foreground/30"
-                onClick={addCustomSection}
+        </div>
+
+        {/* ─── Mobile Preview / Score Pane ─── */}
+        <div className="lg:hidden">
+          {mobileView === "preview" && (
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {t("Live preview")}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Link
+                    href={`/cvs/${initialCv.id}/preview`}
+                    aria-disabled={isDirty}
+                    onNavigate={(event) => {
+                      if (!isDirty) return
+                      event.preventDefault()
+                      setMessage(t("Save your changes before leaving."))
+                    }}
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      isDirty && "cursor-not-allowed opacity-60"
+                    )}
+                  >
+                    <Download data-icon="inline-start" />
+                    {t("Download")}
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFitMobilePreview((current) => !current)}
+                    aria-pressed={fitMobilePreview}
+                  >
+                    {fitMobilePreview ? (
+                      <Maximize2 data-icon="inline-start" />
+                    ) : (
+                      <Minimize2 data-icon="inline-start" />
+                    )}
+                    {t(fitMobilePreview ? "Readable size" : "Fit page")}
+                  </Button>
+                </div>
+              </div>
+              <div
+                className={cn(
+                  "preview-scroll flex min-h-[calc(100dvh-9.75rem)] overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 dark:bg-slate-900",
+                  fitMobilePreview && "justify-center"
+                )}
               >
-                <Plus data-icon="inline-start" /> {t("Add custom section")}
-              </Button>
+                <div
+                  className={cn("w-full", !fitMobilePreview && "min-w-[40rem]")}
+                >
+                  <CvPreview content={content} />
+                </div>
+              </div>
+            </div>
+          )}
+          {mobileView === "score" && (
+            <div className="flex min-h-[calc(100dvh-9.75rem)] overflow-auto rounded-2xl border bg-background p-4 shadow-sm sm:p-6">
+              <AtsScorePanel
+                mode="interactive"
+                content={content}
+                onRecheck={flushNow}
+              />
             </div>
           )}
         </div>
@@ -1878,66 +2047,26 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
           }}
         />
 
-        {/* ─── Preview Pane ─── */}
-        <aside
-          className={cn(
-            "min-w-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden",
-            mobileView === "edit" && "hidden lg:flex"
-          )}
-        >
+        {/* ─── Desktop Preview / Score Pane ─── */}
+        <aside className="hidden min-w-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">
-              {t("Live preview")}
+              {t(rightPane === "score" ? "CV Quality Score" : "Live preview")}
             </p>
-            <div className="flex items-center gap-1 lg:hidden">
-              <Link
-                href={`/cvs/${initialCv.id}/preview`}
-                aria-disabled={isDirty}
-                onNavigate={(event) => {
-                  if (!isDirty) return
-
-                  event.preventDefault()
-                  setMessage(t("Save your changes before leaving."))
-                }}
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "sm" }),
-                  isDirty && "cursor-not-allowed opacity-60"
-                )}
-              >
-                <Download data-icon="inline-start" />
-                {t("Download")}
-              </Link>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setFitMobilePreview((current) => !current)}
-                aria-pressed={fitMobilePreview}
-              >
-                {fitMobilePreview ? (
-                  <Maximize2 data-icon="inline-start" />
-                ) : (
-                  <Minimize2 data-icon="inline-start" />
-                )}
-                {t(fitMobilePreview ? "Readable size" : "Fit page")}
-              </Button>
-            </div>
           </div>
-          <div
-            className={cn(
-              "preview-scroll flex min-h-[calc(100dvh-9.75rem)] overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 lg:min-h-0 lg:flex-1 lg:justify-center dark:bg-slate-900",
-              fitMobilePreview && "justify-center"
-            )}
-          >
-            <div
-              className={cn(
-                "w-full lg:min-w-0",
-                !fitMobilePreview && "min-w-[40rem]"
-              )}
-            >
+          {rightPane === "preview" ? (
+            <div className="preview-scroll flex min-h-0 flex-1 justify-center overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 dark:bg-slate-900">
               <CvPreview content={content} />
             </div>
-          </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 overflow-auto rounded-2xl border bg-background p-4 shadow-sm sm:p-6">
+              <AtsScorePanel
+                mode="interactive"
+                content={content}
+                onRecheck={flushNow}
+              />
+            </div>
+          )}
         </aside>
       </main>
 
@@ -1969,6 +2098,20 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
         >
           <Eye className="size-4" />
           {t("Preview")}
+        </button>
+        <div className="my-2.5 w-px bg-border" />
+        <button
+          type="button"
+          onClick={() => setMobileView("score")}
+          className={cn(
+            "flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors",
+            mobileView === "score"
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <ClipboardCheck className="size-4" />
+          {t("Score")}
         </button>
       </div>
     </div>

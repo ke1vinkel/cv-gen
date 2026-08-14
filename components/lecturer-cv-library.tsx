@@ -27,6 +27,29 @@ function formatUpdated(value: string, locale: string) {
   }).format(new Date(value))
 }
 
+function AtsScoreBadge({ score }: { score: number | null }) {
+  const { t } = useLanguage()
+  const label =
+    score == null
+      ? "Not scored"
+      : score < 40
+        ? "Needs work"
+        : score < 70
+          ? "Developing"
+          : "Strong"
+
+  return (
+    <Badge
+      variant="secondary"
+      title={t(label)}
+      className="shrink-0 gap-1.5 tabular-nums"
+    >
+      <span className="size-1.5 rounded-full bg-muted-foreground/55" />
+      {score ?? "—"}
+    </Badge>
+  )
+}
+
 export function LecturerCvLibrary({ cvs }: { cvs: StudentCvRecord[] }) {
   const { locale, t } = useLanguage()
   const [query, setQuery] = useState("")
@@ -110,9 +133,7 @@ export function LecturerCvLibrary({ cvs }: { cvs: StudentCvRecord[] }) {
           <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-muted">
             <Search className="size-5 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-semibold">
-            {t("No matching students")}
-          </h2>
+          <h2 className="text-lg font-semibold">{t("No matching students")}</h2>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             {t("Try another name or clear the search to view every student.")}
           </p>
@@ -152,9 +173,14 @@ export function LecturerCvLibrary({ cvs }: { cvs: StudentCvRecord[] }) {
                     </p>
                   </div>
                   <Badge variant="secondary">
-                    {t(studentCvs.length === 1 ? "{{count}} CV" : "{{count}} CVs", {
-                      count: studentCvs.length,
-                    })}
+                    {t(
+                      studentCvs.length === 1
+                        ? "{{count}} CV"
+                        : "{{count}} CVs",
+                      {
+                        count: studentCvs.length,
+                      }
+                    )}
                   </Badge>
                 </div>
 
@@ -164,8 +190,9 @@ export function LecturerCvLibrary({ cvs }: { cvs: StudentCvRecord[] }) {
                       key={cv.id}
                       className="ui-stagger-item gap-4 shadow-none transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_35px_rgba(15,23,42,0.06)]"
                     >
-                      <CardHeader>
+                      <CardHeader className="flex-row items-center justify-between gap-3">
                         <CardTitle className="truncate">{cv.title}</CardTitle>
+                        <AtsScoreBadge score={cv.atsScore} />
                       </CardHeader>
                       <CardContent>
                         <CvThumbnail cv={cv} />
