@@ -74,12 +74,12 @@ const sampleCv: CvContent = {
     {
       id: "sample-language-1",
       language: "English",
-      proficiency: "Native or Bilingual",
+      proficiency: "Native",
     },
     {
       id: "sample-language-2",
       language: "Mandarin",
-      proficiency: "Professional Working",
+      proficiency: "Upper-intermediate",
     },
   ],
   customSections: [

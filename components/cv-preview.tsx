@@ -9,7 +9,12 @@ import {
 } from "react"
 
 import { useLanguage } from "@/components/language-provider"
-import type { CvContent, CustomSection, Education, Experience } from "@/lib/cv-schema"
+import type {
+  CvContent,
+  CustomSection,
+  Education,
+  Experience,
+} from "@/lib/cv-schema"
 import type { Translator } from "@/lib/i18n"
 import { renderInlineMarkdown, renderMarkdownBlock } from "@/lib/markdown"
 import { cn } from "@/lib/utils"
@@ -80,9 +85,7 @@ function DateRange({
   const dates = [start, end]
     .filter(Boolean)
     .map((date) => (date === "Present" ? t("Present") : date))
-  return (
-    <span className="cv-date">{dates.join(" - ")}</span>
-  )
+  return <span className="cv-date">{dates.join(" - ")}</span>
 }
 
 function ExperienceBlock({
@@ -192,7 +195,11 @@ function EducationBlock({
               heading
             )}
           </strong>
-          <DateRange start={education.startDate} end={education.endDate} t={t} />
+          <DateRange
+            start={education.startDate}
+            end={education.endDate}
+            t={t}
+          />
         </div>
         <p className="cv-subtitle">
           {education.institution}
@@ -252,9 +259,7 @@ function CustomSectionBlock({
               </a>
             </p>
           )}
-          {item.description && (
-            <>{renderMarkdownBlock(item.description)}</>
-          )}
+          {item.description && <>{renderMarkdownBlock(item.description)}</>}
           {item.bullets && item.bullets.length > 0 && (
             <ul>
               {item.bullets.map((bullet, index) => (
@@ -395,7 +400,9 @@ function buildBlocks(content: CvContent, t: Translator): ReactNode[] {
                 <div className="cv-language" key={language.id}>
                   <span className="cv-language-name">{language.language}</span>
                   {language.proficiency !== "Not Rated" && (
-                    <span>{t(language.proficiency)}</span>
+                    <span className="cv-language-proficiency">
+                      {t(language.proficiency)}
+                    </span>
                   )}
                 </div>
               ))}
@@ -471,10 +478,7 @@ export function CvPreview({
         const height = block.getBoundingClientRect().height
         const currentPage = nextPages[nextPages.length - 1]
 
-        if (
-          currentPage.length > 0 &&
-          usedHeight + height > A4_CONTENT_HEIGHT
-        ) {
+        if (currentPage.length > 0 && usedHeight + height > A4_CONTENT_HEIGHT) {
           nextPages.push([index])
           usedHeight = height
         } else {

@@ -65,10 +65,6 @@ export function ensureAppSchema() {
           user_id TEXT NOT NULL,
           title TEXT NOT NULL,
           content_json TEXT NOT NULL,
-          cv_quality_score INTEGER,
-          cv_quality_breakdown TEXT,
-          cv_quality_scoring_version INTEGER,
-          cv_quality_scored_at TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         )`,
@@ -77,29 +73,6 @@ export function ensureAppSchema() {
       "write"
     )
 
-    const qualityColumns = [
-      ["ats_score", "cv_quality_score", "INTEGER"],
-      ["ats_breakdown", "cv_quality_breakdown", "TEXT"],
-      ["ats_scoring_version", "cv_quality_scoring_version", "INTEGER"],
-      ["ats_scored_at", "cv_quality_scored_at", "TEXT"],
-    ]
-    const columnsResult = await db.execute("PRAGMA table_info(cvs)")
-    const existingColumns = new Set(
-      columnsResult.rows.map((row) => String(row.name))
-    )
-
-    for (const [legacyName, qualityName, type] of qualityColumns) {
-      if (existingColumns.has(legacyName) && !existingColumns.has(qualityName)) {
-        await db.execute(
-          `ALTER TABLE cvs RENAME COLUMN ${legacyName} TO ${qualityName}`
-        )
-        existingColumns.delete(legacyName)
-        existingColumns.add(qualityName)
-      } else if (!existingColumns.has(qualityName)) {
-        await db.execute(`ALTER TABLE cvs ADD COLUMN ${qualityName} ${type}`)
-        existingColumns.add(qualityName)
-      }
-    }
   })()
 
   return appSchemaPromise

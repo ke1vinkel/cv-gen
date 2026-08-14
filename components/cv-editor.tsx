@@ -6,7 +6,6 @@ import {
   Bold,
   BriefcaseBusiness,
   Check,
-  ClipboardCheck,
   ChevronDown,
   ChevronRight,
   Download,
@@ -43,7 +42,6 @@ import {
 } from "react"
 
 import { CvPreview } from "@/components/cv-preview"
-import { AtsScorePanel } from "@/components/ats-score-panel"
 import { LanguageToggle } from "@/components/language-toggle"
 import { useLanguage } from "@/components/language-provider"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -72,22 +70,18 @@ import { cn } from "@/lib/utils"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
 type SectionKey =
-  | "personal"
-  | "summary"
-  | "experience"
-  | "education"
-  | "skills"
-  | "languages"
-type MobileView = "edit" | "preview" | "score"
-type RightPane = "preview" | "score"
+  "personal" | "summary" | "experience" | "education" | "skills" | "languages"
+type MobileView = "edit" | "preview"
 
 const languageProficiencies: Language["proficiency"][] = [
   "Not Rated",
-  "Elementary",
-  "Limited Working",
-  "Professional Working",
-  "Full Professional",
-  "Native or Bilingual",
+  "Beginner",
+  "Basic",
+  "Intermediate",
+  "Upper-intermediate",
+  "Advanced",
+  "Fluent",
+  "Native",
 ]
 
 const BUILT_IN_SECTIONS = new Set([
@@ -101,11 +95,7 @@ const BUILT_IN_SECTIONS = new Set([
 
 // ─── Resizable Split ──────────────────────────────────────────────
 
-function ResizeHandle({
-  onResize,
-}: {
-  onResize: (delta: number) => void
-}) {
+function ResizeHandle({ onResize }: { onResize: (delta: number) => void }) {
   const handleRef = useRef<HTMLDivElement>(null)
 
   function handlePointerDown(event: React.PointerEvent) {
@@ -133,7 +123,7 @@ function ResizeHandle({
     <div
       ref={handleRef}
       onPointerDown={handlePointerDown}
-      className="hidden lg:flex w-2 cursor-col-resize items-center justify-center hover:bg-primary/10 active:bg-primary/20 transition-colors select-none touch-none"
+      className="hidden w-2 cursor-col-resize touch-none items-center justify-center transition-colors select-none hover:bg-primary/10 active:bg-primary/20 lg:flex"
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize panels"
@@ -167,7 +157,9 @@ function markdownToEditorHtml(value: string) {
 
   function flushBullets() {
     if (!bullets.length) return
-    html.push(`<ul>${bullets.map((line) => `<li>${inlineMarkdownToHtml(line)}</li>`).join("")}</ul>`)
+    html.push(
+      `<ul>${bullets.map((line) => `<li>${inlineMarkdownToHtml(line)}</li>`).join("")}</ul>`
+    )
     bullets = []
   }
 
@@ -176,7 +168,9 @@ function markdownToEditorHtml(value: string) {
       bullets.push(line.slice(2))
     } else {
       flushBullets()
-      html.push(line ? `<div>${inlineMarkdownToHtml(line)}</div>` : "<div><br></div>")
+      html.push(
+        line ? `<div>${inlineMarkdownToHtml(line)}</div>` : "<div><br></div>"
+      )
     }
   }
   flushBullets()
@@ -244,10 +238,13 @@ function FormattingTextarea({
   })
   const { t } = useLanguage()
 
-  const setEditorRef = useCallback((editor: HTMLDivElement | null) => {
-    ref.current = editor
-    if (editor) editor.innerHTML = initialHtml
-  }, [initialHtml])
+  const setEditorRef = useCallback(
+    (editor: HTMLDivElement | null) => {
+      ref.current = editor
+      if (editor) editor.innerHTML = initialHtml
+    },
+    [initialHtml]
+  )
 
   useEffect(() => {
     const editor = ref.current
@@ -259,8 +256,14 @@ function FormattingTextarea({
   function updateActiveFormats() {
     const editor = ref.current
     const selection = window.getSelection()
-    if (!editor || !selection?.anchorNode || !editor.contains(selection.anchorNode)) return
-    if (selection.rangeCount) selectionRef.current = selection.getRangeAt(0).cloneRange()
+    if (
+      !editor ||
+      !selection?.anchorNode ||
+      !editor.contains(selection.anchorNode)
+    )
+      return
+    if (selection.rangeCount)
+      selectionRef.current = selection.getRangeAt(0).cloneRange()
     setActiveFormats({
       bold: document.queryCommandState("bold"),
       italic: document.queryCommandState("italic"),
@@ -302,7 +305,8 @@ function FormattingTextarea({
     if (url && /^https?:\/\//i.test(url)) runCommand("createLink", url)
   }
 
-  const toolClass = "size-9 rounded-lg data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+  const toolClass =
+    "size-9 rounded-lg data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
 
   return (
     <div className="overflow-hidden rounded-xl bg-input/50 focus-within:ring-3 focus-within:ring-ring/30">
@@ -468,7 +472,7 @@ function EditorSection({
             <span className="min-w-0 flex-1 text-lg font-medium tracking-tight">
               {t(title)}
             </span>
-            <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium tabular-nums text-muted-foreground">
+            <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground tabular-nums">
               {completion}%
             </span>
           </button>
@@ -549,10 +553,7 @@ function CustomSectionEditor({
   const { t } = useLanguage()
   const [isExpanded, setIsExpanded] = useState(false)
 
-  function updateItem(
-    itemId: string,
-    patch: Partial<CustomSectionItem>
-  ) {
+  function updateItem(itemId: string, patch: Partial<CustomSectionItem>) {
     onUpdate({
       items: section.items.map((item) =>
         item.id === itemId ? { ...item, ...patch } : item
@@ -640,7 +641,7 @@ function CustomSectionEditor({
           onChange={(event) => {
             onUpdate({ title: event.target.value })
           }}
-          className="min-w-0 flex-1 text-2xl font-semibold tracking-tight bg-transparent border-none"
+          className="min-w-0 flex-1 border-none bg-transparent text-2xl font-semibold tracking-tight"
           aria-label={t("Section title")}
           maxLength={100}
         />
@@ -886,7 +887,10 @@ function useAutoSave(
         if (!isMountedRef.current) return
 
         if (!response.ok) {
-          onSaveStateChange("error", data.error ?? "Could not save your changes.")
+          onSaveStateChange(
+            "error",
+            data.error ?? "Could not save your changes."
+          )
           return
         }
 
@@ -1004,8 +1008,6 @@ function sectionCompletion(content: CvContent, section: SectionKey) {
   }
 }
 
-
-
 // ─── Main Editor ──────────────────────────────────────────────────
 
 export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
@@ -1036,7 +1038,6 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
   const isDirtyRef = useRef(false)
   const hasHistoryGuard = useRef(false)
   const [mobileView, setMobileView] = useState<MobileView>("edit")
-  const [rightPane, setRightPane] = useState<RightPane>("preview")
   const [fitMobilePreview, setFitMobilePreview] = useState(false)
   const [splitPercent, setSplitPercent] = useState(36)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -1081,11 +1082,11 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
     [t]
   )
 
-  const { scheduleAutoSave, flushNow, cancel: cancelAutoSave } = useAutoSave(
-    initialCv.id,
-    getPayload,
-    handleSaveStateChange
-  )
+  const {
+    scheduleAutoSave,
+    flushNow,
+    cancel: cancelAutoSave,
+  } = useAutoSave(initialCv.id, getPayload, handleSaveStateChange)
 
   // Ensure sectionOrder exists (backward compatibility)
   const sectionOrder = content.sectionOrder ?? [...defaultSectionOrder]
@@ -1209,8 +1210,6 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
       setIsDirty(false)
     }
   }
-
-
 
   // Build ordered section list for rendering
   function renderSections() {
@@ -1347,9 +1346,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("experience")}
                 onBack={() => setActiveSection(null)}
-                onToggleVisibility={() =>
-                  toggleSectionVisibility("experience")
-                }
+                onToggleVisibility={() => toggleSectionVisibility("experience")}
               >
                 <div className="mb-7">
                   <Button
@@ -1505,9 +1502,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("education")}
                 onBack={() => setActiveSection(null)}
-                onToggleVisibility={() =>
-                  toggleSectionVisibility("education")
-                }
+                onToggleVisibility={() => toggleSectionVisibility("education")}
               >
                 <div className="mb-5">
                   <Button
@@ -1515,10 +1510,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                     className="h-12 w-full rounded-xl border-dashed bg-transparent text-base font-medium"
                     onClick={() =>
                       updateContent({
-                        education: [
-                          ...content.education,
-                          blankEducation(t),
-                        ],
+                        education: [...content.education, blankEducation(t)],
                       })
                     }
                   >
@@ -1589,9 +1581,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                           />
                         </label>
                         <label className="block">
-                          <span className="sr-only">
-                            {t("Field of Study")}
-                          </span>
+                          <span className="sr-only">{t("Field of Study")}</span>
                           <Input
                             className="h-12 rounded-xl px-4"
                             value={education.fieldOfStudy ?? ""}
@@ -1703,9 +1693,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 orderClass={`order-[${orderIndex}]`}
                 onOpen={() => setActiveSection("languages")}
                 onBack={() => setActiveSection(null)}
-                onToggleVisibility={() =>
-                  toggleSectionVisibility("languages")
-                }
+                onToggleVisibility={() => toggleSectionVisibility("languages")}
               >
                 <div className="mb-7">
                   <Button
@@ -1713,10 +1701,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                     className="h-12 w-full rounded-xl border-dashed bg-transparent text-base"
                     onClick={() =>
                       updateContent({
-                        languages: [
-                          ...content.languages,
-                          blankLanguage(),
-                        ],
+                        languages: [...content.languages, blankLanguage()],
                       })
                     }
                   >
@@ -1750,9 +1735,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                         />
                       </FormField>
                       <div className="space-y-2">
-                        <Label
-                          htmlFor={`language-proficiency-${language.id}`}
-                        >
+                        <Label htmlFor={`language-proficiency-${language.id}`}>
                           {t("Proficiency")}
                         </Label>
                         <DropdownMenu>
@@ -1783,6 +1766,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                                 <DropdownMenuRadioItem
                                   key={proficiency}
                                   value={proficiency}
+                                  closeOnClick
                                   className="min-h-10 rounded-xl px-3.5 py-2.5 font-normal transition-colors focus:bg-muted focus:text-foreground focus:**:text-foreground data-checked:bg-primary/10 data-checked:font-medium data-checked:text-primary"
                                 >
                                   {t(proficiency)}
@@ -1881,7 +1865,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               }}
               aria-label={t("CV title")}
               maxLength={100}
-              className="min-w-0 max-w-md bg-transparent text-base font-semibold"
+              className="max-w-md min-w-0 bg-transparent text-base font-semibold"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -1891,7 +1875,7 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
                 saveState === "error"
                   ? "text-destructive"
                   : saveState === "saving"
-                    ? "text-muted-foreground animate-pulse"
+                    ? "animate-pulse text-muted-foreground"
                     : "text-muted-foreground"
               )}
               role="status"
@@ -1917,21 +1901,6 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               <Eye data-icon="inline-start" />
               {t("Preview")}
             </Link>
-            <Button
-              type="button"
-              variant={rightPane === "score" ? "secondary" : "outline"}
-              size="sm"
-              className="hidden lg:inline-flex"
-              onClick={() =>
-                setRightPane((current) =>
-                  current === "score" ? "preview" : "score"
-                )
-              }
-              aria-pressed={rightPane === "score"}
-            >
-              <ClipboardCheck data-icon="inline-start" />
-              {t("Score")}
-            </Button>
             <Button size="sm" onClick={save} disabled={saveState === "saving"}>
               {saveState === "saving" ? (
                 <LoaderCircle
@@ -1967,10 +1936,9 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
           )}
         >
           {renderSections()}
-
         </div>
 
-        {/* ─── Mobile Preview / Score Pane ─── */}
+        {/* ─── Mobile Preview Pane ─── */}
         <div className="lg:hidden">
           {mobileView === "preview" && (
             <div>
@@ -2025,15 +1993,6 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
               </div>
             </div>
           )}
-          {mobileView === "score" && (
-            <div className="flex min-h-[calc(100dvh-9.75rem)] overflow-auto rounded-2xl border bg-background p-4 shadow-sm sm:p-6">
-              <AtsScorePanel
-                mode="interactive"
-                content={content}
-                onRecheck={flushNow}
-              />
-            </div>
-          )}
         </div>
 
         {/* ─── Resize Handle (Desktop only) ─── */}
@@ -2041,37 +2000,26 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
           onResize={(delta) => {
             if (!containerRef.current) return
             const containerWidth = containerRef.current.offsetWidth
-            const newPercent =
-              splitPercent + (delta / containerWidth) * 100
+            const newPercent = splitPercent + (delta / containerWidth) * 100
             setSplitPercent(Math.max(25, Math.min(60, newPercent)))
           }}
         />
 
-        {/* ─── Desktop Preview / Score Pane ─── */}
+        {/* ─── Desktop Preview Pane ─── */}
         <aside className="hidden min-w-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">
-              {t(rightPane === "score" ? "CV Quality Score" : "Live preview")}
+              {t("Live preview")}
             </p>
           </div>
-          {rightPane === "preview" ? (
-            <div className="preview-scroll flex min-h-0 flex-1 justify-center overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 dark:bg-slate-900">
-              <CvPreview content={content} />
-            </div>
-          ) : (
-            <div className="flex min-h-0 flex-1 overflow-auto rounded-2xl border bg-background p-4 shadow-sm sm:p-6">
-              <AtsScorePanel
-                mode="interactive"
-                content={content}
-                onRecheck={flushNow}
-              />
-            </div>
-          )}
+          <div className="preview-scroll flex min-h-0 flex-1 justify-center overflow-auto rounded-2xl border bg-slate-200 p-4 shadow-sm sm:p-6 dark:bg-slate-900">
+            <CvPreview content={content} />
+          </div>
         </aside>
       </main>
 
       {/* ─── Mobile Toggle Bar ─── */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 flex border-t bg-background/95 backdrop-blur lg:hidden print:hidden">
+      <div className="fixed right-0 bottom-0 left-0 z-30 flex border-t bg-background/95 backdrop-blur lg:hidden print:hidden">
         <button
           type="button"
           onClick={() => setMobileView("edit")}
@@ -2098,20 +2046,6 @@ export function CvEditor({ initialCv }: { initialCv: CvRecord }) {
         >
           <Eye className="size-4" />
           {t("Preview")}
-        </button>
-        <div className="my-2.5 w-px bg-border" />
-        <button
-          type="button"
-          onClick={() => setMobileView("score")}
-          className={cn(
-            "flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors",
-            mobileView === "score"
-              ? "text-primary"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <ClipboardCheck className="size-4" />
-          {t("Score")}
         </button>
       </div>
     </div>

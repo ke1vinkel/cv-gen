@@ -1,7 +1,5 @@
 import { z } from "zod"
 
-import type { AtsCategoryResult } from "@/lib/ats-scoring"
-
 const requiredText = z.string().trim().min(1).max(200)
 const optionalText = z.string().trim().max(500)
 const optionalUrl = z
@@ -67,17 +65,35 @@ export const educationSchema = z.object({
   details: optionalText,
 })
 
+const legacyLanguageProficiencies: Record<string, string> = {
+  Elementary: "Beginner",
+  "Limited Working": "Intermediate",
+  "Professional Working": "Upper-intermediate",
+  "Full Professional": "Advanced",
+  "Native or Bilingual": "Native",
+}
+
+const languageProficiencySchema = z.preprocess(
+  (value) =>
+    typeof value === "string"
+      ? (legacyLanguageProficiencies[value] ?? value)
+      : value,
+  z.enum([
+    "Not Rated",
+    "Beginner",
+    "Basic",
+    "Intermediate",
+    "Upper-intermediate",
+    "Advanced",
+    "Fluent",
+    "Native",
+  ])
+)
+
 export const languageSchema = z.object({
   id: z.string().min(1),
   language: requiredText,
-  proficiency: z.enum([
-    "Not Rated",
-    "Elementary",
-    "Limited Working",
-    "Professional Working",
-    "Full Professional",
-    "Native or Bilingual",
-  ]),
+  proficiency: languageProficiencySchema,
 })
 
 export const cvContentSchema = z.object({
@@ -133,10 +149,6 @@ export type CvRecord = {
   id: string
   title: string
   content: CvContent
-  atsScore: number | null
-  atsBreakdown: AtsCategoryResult[] | null
-  atsScoringVersion: number | null
-  atsScoredAt: string | null
   createdAt: string
   updatedAt: string
 }

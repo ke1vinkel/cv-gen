@@ -1,9 +1,6 @@
 import "server-only"
 
 import { randomUUID } from "node:crypto"
-import { z } from "zod"
-
-import { scoreCv, type AtsCategoryResult } from "@/lib/ats-scoring"
 import {
   createEmptyCv,
   cvContentSchema,
@@ -20,46 +17,11 @@ export type StudentCvRecord = CvRecord & {
   }
 }
 
-const storedBreakdownSchema = z.array(
-  z.object({
-    category: z.string(),
-    score: z.number(),
-    maxScore: z.number(),
-    criticalIssues: z.array(
-      z.object({
-        id: z.string(),
-        severity: z.enum(["critical", "warning", "info"]),
-        messageKey: z.string(),
-      })
-    ),
-  })
-)
-
-function parseAtsBreakdown(raw: unknown): AtsCategoryResult[] | null {
-  if (raw == null) return null
-  try {
-    const result = storedBreakdownSchema.safeParse(JSON.parse(String(raw)))
-    return result.success ? result.data : null
-  } catch {
-    return null
-  }
-}
-
 function parseCvRow(row: Record<string, unknown>): CvRecord {
   return {
     id: String(row.id),
     title: String(row.title),
     content: cvContentSchema.parse(JSON.parse(String(row.content_json))),
-    atsScore:
-      row.cv_quality_score != null ? Number(row.cv_quality_score) : null,
-    atsBreakdown: parseAtsBreakdown(row.cv_quality_breakdown),
-    atsScoringVersion:
-      row.cv_quality_scoring_version != null
-        ? Number(row.cv_quality_scoring_version)
-        : null,
-    atsScoredAt: row.cv_quality_scored_at
-      ? String(row.cv_quality_scored_at)
-      : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   }
@@ -69,9 +31,7 @@ export async function listCvs(userId: string): Promise<CvRecord[]> {
   await ensureAppSchema()
 
   const result = await getAppDb().execute({
-    sql: `SELECT id, title, content_json, cv_quality_score,
-                 cv_quality_breakdown, cv_quality_scoring_version,
-                 cv_quality_scored_at, created_at, updated_at
+    sql: `SELECT id, title, content_json, created_at, updated_at
           FROM cvs WHERE user_id = ? ORDER BY updated_at DESC`,
     args: [userId],
   })
@@ -106,9 +66,7 @@ export async function listStudentCvs(): Promise<StudentCvRecord[]> {
   const studentIds = [...students.keys()]
   const placeholders = studentIds.map(() => "?").join(", ")
   const result = await getAppDb().execute({
-    sql: `SELECT id, user_id, title, content_json, cv_quality_score,
-                 cv_quality_breakdown, cv_quality_scoring_version,
-                 cv_quality_scored_at, created_at, updated_at
+    sql: `SELECT id, user_id, title, content_json, created_at, updated_at
           FROM cvs
           WHERE user_id IN (${placeholders})
           ORDER BY updated_at DESC`,
@@ -127,9 +85,7 @@ export async function getStudentCv(
   await ensureAppSchema()
 
   const result = await getAppDb().execute({
-    sql: `SELECT id, user_id, title, content_json, cv_quality_score,
-                 cv_quality_breakdown, cv_quality_scoring_version,
-                 cv_quality_scored_at, created_at, updated_at
+    sql: `SELECT id, user_id, title, content_json, created_at, updated_at
           FROM cvs WHERE id = ? LIMIT 1`,
     args: [id],
   })
@@ -162,9 +118,7 @@ export async function getCv(userId: string, id: string) {
   await ensureAppSchema()
 
   const result = await getAppDb().execute({
-    sql: `SELECT id, title, content_json, cv_quality_score,
-                 cv_quality_breakdown, cv_quality_scoring_version,
-                 cv_quality_scored_at, created_at, updated_at
+    sql: `SELECT id, title, content_json, created_at, updated_at
           FROM cvs WHERE id = ? AND user_id = ? LIMIT 1`,
     args: [id, userId],
   })
@@ -180,26 +134,11 @@ export async function createCv(userId: string, email: string, title: string) {
   const id = randomUUID()
   const timestamp = new Date().toISOString()
   const content = createEmptyCv(email)
-  const atsResult = scoreCv(content)
-
   await getAppDb().execute({
     sql: `INSERT INTO cvs
-          (id, user_id, title, content_json, cv_quality_score,
-           cv_quality_breakdown, cv_quality_scoring_version,
-           cv_quality_scored_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [
-      id,
-      userId,
-      title,
-      JSON.stringify(content),
-      atsResult.overall,
-      JSON.stringify(atsResult.categories),
-      atsResult.version,
-      timestamp,
-      timestamp,
-      timestamp,
-    ],
+          (id, user_id, title, content_json, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [id, userId, title, JSON.stringify(content), timestamp, timestamp],
   })
 
   return getCv(userId, id)
@@ -211,23 +150,15 @@ export async function duplicateCv(userId: string, id: string) {
 
   const duplicateId = randomUUID()
   const timestamp = new Date().toISOString()
-  const atsResult = scoreCv(source.content)
-
   await getAppDb().execute({
     sql: `INSERT INTO cvs
-          (id, user_id, title, content_json, cv_quality_score,
-           cv_quality_breakdown, cv_quality_scoring_version,
-           cv_quality_scored_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, user_id, title, content_json, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
     args: [
       duplicateId,
       userId,
       `${source.title} (Copy)`,
       JSON.stringify(source.content),
-      atsResult.overall,
-      JSON.stringify(atsResult.categories),
-      atsResult.version,
-      timestamp,
       timestamp,
       timestamp,
     ],
@@ -244,25 +175,12 @@ export async function updateCv(
 ) {
   await ensureAppSchema()
 
-  const atsResult = scoreCv(content)
   const updatedAt = new Date().toISOString()
   const result = await getAppDb().execute({
     sql: `UPDATE cvs
-          SET title = ?, content_json = ?, updated_at = ?,
-              cv_quality_score = ?, cv_quality_breakdown = ?,
-              cv_quality_scoring_version = ?, cv_quality_scored_at = ?
+          SET title = ?, content_json = ?, updated_at = ?
           WHERE id = ? AND user_id = ?`,
-    args: [
-      title,
-      JSON.stringify(content),
-      updatedAt,
-      atsResult.overall,
-      JSON.stringify(atsResult.categories),
-      atsResult.version,
-      updatedAt,
-      id,
-      userId,
-    ],
+    args: [title, JSON.stringify(content), updatedAt, id, userId],
   })
 
   return result.rowsAffected > 0 ? getCv(userId, id) : null
@@ -284,24 +202,17 @@ export async function restoreCv(
   cv: Pick<CvRecord, "id" | "title" | "content" | "createdAt" | "updatedAt">
 ) {
   await ensureAppSchema()
-  const atsResult = scoreCv(cv.content)
   const timestamp = new Date().toISOString()
 
   await getAppDb().execute({
     sql: `INSERT INTO cvs
-          (id, user_id, title, content_json, cv_quality_score,
-           cv_quality_breakdown, cv_quality_scoring_version,
-           cv_quality_scored_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, user_id, title, content_json, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
     args: [
       cv.id,
       userId,
       cv.title,
       JSON.stringify(cv.content),
-      atsResult.overall,
-      JSON.stringify(atsResult.categories),
-      atsResult.version,
-      timestamp,
       cv.createdAt,
       timestamp,
     ],

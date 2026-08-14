@@ -139,19 +139,6 @@ body {
   min-width: 320px;
 }
 
-.ats-score-ring {
-  transition: stroke-dashoffset 0.6s ease-out;
-}
-
-.ats-category-bar {
-  transition: width 0.4s ease-out;
-}
-
-.ats-panel-stale {
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-}
-
 @media (min-width: 1024px) {
   .editor-scroll {
     scrollbar-width: none;
@@ -402,8 +389,8 @@ body {
   font-weight: 400;
 }
 
-.cv-language span {
-  color: #5c5c5c;
+.cv-language-proficiency {
+  color: #777777;
   font-size: 12px;
   text-align: right;
 }

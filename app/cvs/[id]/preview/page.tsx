@@ -3,7 +3,6 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 
 import { CvPreview } from "@/components/cv-preview"
-import { AtsScorePanel } from "@/components/ats-score-panel"
 import { LanguageToggle } from "@/components/language-toggle"
 import { PrintButton } from "@/components/print-button"
 import { buttonVariants } from "@/components/ui/button"
@@ -41,26 +40,6 @@ export default async function PreviewCvPage(
         </div>
       </div>
       <CvPreview content={cv.content} className="mx-auto" />
-      {user.role === "lecturer" && (
-        <div className="mx-auto mt-6 max-w-[794px] print:hidden">
-          {cv.atsScore != null &&
-          cv.atsBreakdown != null &&
-          cv.atsScoringVersion != null &&
-          cv.atsScoredAt != null ? (
-            <AtsScorePanel
-              mode="readonly"
-              score={cv.atsScore}
-              breakdown={cv.atsBreakdown}
-              scoredAt={cv.atsScoredAt}
-              scoringVersion={cv.atsScoringVersion}
-            />
-          ) : (
-            <p className="rounded-2xl border bg-background p-5 text-sm text-muted-foreground shadow-sm">
-              {t("This CV has not been scored yet.")}
-            </p>
-          )}
-        </div>
-      )}
     </main>
   )
 }
