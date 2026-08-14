@@ -310,16 +310,6 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <Link
-                        href={`/cvs/${cv.id}/edit`}
-                        className={cn(
-                          buttonVariants({ variant: "ghost", size: "icon-sm" }),
-                          "hidden sm:inline-flex"
-                        )}
-                        aria-label={t("Edit {{title}}", { title: cv.title })}
-                      >
-                        <Pencil />
-                      </Link>
                     </CardAction>
                   </CardHeader>
                   <CardContent className="space-y-5">

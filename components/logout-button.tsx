@@ -20,7 +20,12 @@ export function LogoutButton() {
   }
 
   return (
-    <Button variant="ghost" size="sm" disabled={pending} onClick={logout}>
+    <Button
+      variant="destructive"
+      size="sm"
+      disabled={pending}
+      onClick={logout}
+    >
       <LogOut data-icon="inline-start" />
       {t(pending ? "Signing out" : "Sign out")}
     </Button>

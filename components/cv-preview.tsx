@@ -16,9 +16,19 @@ import { cn } from "@/lib/utils"
 
 const A4_WIDTH = 794
 const A4_HEIGHT = 1123
-const A4_PAGE_PADDING = 116
-const A4_BOTTOM_SAFETY = 24
+const A4_PAGE_PADDING = 96
+const A4_BOTTOM_SAFETY = 14
 const A4_CONTENT_HEIGHT = A4_HEIGHT - A4_PAGE_PADDING - A4_BOTTOM_SAFETY
+
+function safeExternalUrl(value: string | undefined) {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:" ? value : null
+  } catch {
+    return null
+  }
+}
 
 function dateSortValue(value: string) {
   const normalized = value.trim().toLowerCase()
@@ -147,6 +157,15 @@ function EducationBlock({
   compact: boolean
   t: Translator
 }) {
+  const educationUrl = safeExternalUrl(education.url)
+  const heading = education.fieldOfStudy || education.degree
+  const educationDetails = education.details?.trim()
+  const detailSuffix = educationDetails
+    ? educationDetails.startsWith("(")
+      ? ` ${educationDetails}`
+      : ` (${educationDetails})`
+    : ""
+
   return (
     <section
       className={cn(
@@ -159,12 +178,28 @@ function EducationBlock({
       {showHeading && <h2>{t("Education")}</h2>}
       <div className="cv-entry">
         <div className="cv-entry-head">
-          <strong>{education.degree}</strong>
+          <strong>
+            {educationUrl ? (
+              <a
+                href={educationUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-current/40 underline-offset-2"
+              >
+                {heading}
+              </a>
+            ) : (
+              heading
+            )}
+          </strong>
           <DateRange start={education.startDate} end={education.endDate} t={t} />
         </div>
         <p className="cv-subtitle">
           {education.institution}
-          {education.details ? `, ${education.details}` : ""}
+          {education.fieldOfStudy && education.degree
+            ? ` — ${education.degree}`
+            : ""}
+          {detailSuffix}
         </p>
       </div>
     </section>
@@ -337,8 +372,8 @@ function buildBlocks(content: CvContent, t: Translator): ReactNode[] {
           <section className="cv-section" data-cv-block key="skills">
             <h2>{t("Skills")}</h2>
             <ul className="cv-skills">
-              {content.skills.map((skill) => (
-                <li key={skill}>{renderInlineMarkdown(skill)}</li>
+              {content.skills.map((skill, index) => (
+                <li key={`${skill}-${index}`}>{renderInlineMarkdown(skill)}</li>
               ))}
             </ul>
           </section>

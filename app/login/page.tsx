@@ -51,12 +51,13 @@ const sampleCv: CvContent = {
   education: [
     {
       id: "sample-education",
-      degree: "Computer Science",
+      degree: "Bachelor of Arts",
       institution: "Harvard University",
-      fieldOfStudy: "Human-Computer Interaction",
+      fieldOfStudy: "Computer Science",
+      url: "https://www.harvard.edu",
       startDate: "09/2022",
       endDate: "Present",
-      details: "B.A. candidate · GPA 3.8/4.0 · Dean's List",
+      details: "GPA: 3.8/4.0 · Dean's List",
     },
   ],
   skills: [
