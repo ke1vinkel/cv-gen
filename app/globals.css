@@ -298,6 +298,8 @@ body {
   color: #333333;
   font-size: 14px;
   line-height: 1.65;
+  text-align: justify;
+  text-justify: inter-word;
 }
 
 .cv-entry {
@@ -349,12 +351,16 @@ body {
   font-size: 13.5px;
   line-height: 1.6;
   overflow-wrap: anywhere;
+  text-align: justify;
+  text-justify: inter-word;
 }
 
 .cv-detail-line {
   margin: 7px 0 0;
   color: #333333;
   overflow-wrap: anywhere;
+  text-align: justify;
+  text-justify: inter-word;
 }
 
 .cv-entry a,
