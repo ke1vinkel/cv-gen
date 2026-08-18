@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 
 export function proxy(request: NextRequest) {
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64")
   const isDevelopment = process.env.NODE_ENV === "development"
+  const allowedAncestors = [
+    "'self'",
+    process.env.ALLOWED_FRAME_ANCESTORS,
+    "https://*.domain.com",
+    isDevelopment ? "http://localhost:* http://127.0.0.1:*" : "",
+    "https://*.vercel.app https://*.netlify.app https://*.github.dev https://*.github.io",
+  ]
+    .filter(Boolean)
+    .join(" ")
+
   const contentSecurityPolicy = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""};
-    style-src 'self'${isDevelopment ? " 'unsafe-inline'" : ` 'nonce-${nonce}'`};
+    script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""};
+    style-src 'self' 'unsafe-inline';
     style-src-attr 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
@@ -14,14 +23,13 @@ export function proxy(request: NextRequest) {
     object-src 'none';
     base-uri 'self';
     form-action 'self';
-    frame-ancestors 'none';
+    frame-ancestors ${allowedAncestors};
     ${isDevelopment ? "" : "upgrade-insecure-requests;"}
   `
     .replace(/\s{2,}/g, " ")
     .trim()
 
   const requestHeaders = new Headers(request.headers)
-  requestHeaders.set("x-nonce", nonce)
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy)
 
   const response = NextResponse.next({
