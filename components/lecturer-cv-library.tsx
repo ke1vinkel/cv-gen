@@ -174,7 +174,10 @@ export function LecturerCvLibrary({ cvs }: { cvs: StudentCvRecord[] }) {
                         <CvThumbnail cv={cv} />
                       </CardContent>
                       <CardFooter className="flex items-center justify-between gap-3 border-t">
-                        <span className="text-xs text-muted-foreground">
+                        <span
+                          suppressHydrationWarning
+                          className="text-xs text-muted-foreground"
+                        >
                           {t("Updated {{date}}", {
                             date: formatUpdated(cv.updatedAt, locale),
                           })}

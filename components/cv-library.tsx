@@ -315,7 +315,10 @@ export function CvLibrary({ initialCvs }: { initialCvs: CvRecord[] }) {
                   <CardContent className="space-y-5">
                     <CvThumbnail cv={cv} />
                     <div>
-                      <span className="text-xs text-muted-foreground">
+                      <span
+                        suppressHydrationWarning
+                        className="text-xs text-muted-foreground"
+                      >
                         {t("Updated {{date}}", {
                           date: formatUpdated(cv.updatedAt, locale),
                         })}

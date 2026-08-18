@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     template: "%s | CV Gen",
   },
   description: "Create, manage, and export focused CVs for every opportunity.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 }
 
 export default async function RootLayout({
@@ -38,7 +41,7 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, fontSans.variable)}
     >
-      <body>
+      <body suppressHydrationWarning>
         <LanguageProvider initialLocale={locale}>
           <ThemeProvider>{children}</ThemeProvider>
         </LanguageProvider>

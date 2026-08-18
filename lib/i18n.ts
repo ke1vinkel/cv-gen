@@ -84,6 +84,8 @@ const idMessages: Record<string, string> = {
   "{{count}} CVs": "{{count}} CV",
   "View CV": "Lihat CV",
   "Print or save PDF": "Cetak atau simpan PDF",
+  "Open in new tab": "Buka di tab baru",
+  "Open in new tab to print": "Buka di tab baru untuk cetak",
   "Back to dashboard": "Kembali ke dasbor",
   "Back to editor": "Kembali ke editor",
   "Personal details": "Data pribadi",
