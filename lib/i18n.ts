@@ -9,7 +9,7 @@ const idMessages: Record<string, string> = {
   English: "Inggris",
   Indonesian: "Indonesia",
   "Internal access": "Akses internal",
-  "Sign in to CV Gen": "Masuk ke CV Gen",
+  "Sign in to CV App": "Masuk ke CV App",
   "Accounts are managed internally.": "Akun dikelola secara internal.",
   "CV preview": "Pratinjau CV",
   "Professional template": "Templat profesional",
@@ -34,7 +34,7 @@ const idMessages: Record<string, string> = {
   "Toggle theme": "Ganti tema",
   "Switch to light theme": "Gunakan tema terang",
   "Switch to dark theme": "Gunakan tema gelap",
-  "CV Gen home": "Beranda CV Gen",
+  "CV App home": "Beranda CV App",
   "Review the latest CV versions created by students.":
     "Tinjau versi CV terbaru yang dibuat oleh mahasiswa.",
   Students: "Mahasiswa",

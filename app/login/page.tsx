@@ -129,7 +129,7 @@ export default async function LoginPage() {
             {t("Internal access")}
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">
-            {t("Sign in to CV Gen")}
+            {t("Sign in to CV App")}
           </h1>
           <div className="mt-8">
             <AuthForm />

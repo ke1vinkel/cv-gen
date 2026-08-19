@@ -19,8 +19,8 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "CV Gen | CV builder",
-    template: "%s | CV Gen",
+    default: "CV App | CV builder",
+    template: "%s | CV App",
   },
   description: "Create, manage, and export focused CVs for every opportunity.",
   icons: {

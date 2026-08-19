@@ -12,12 +12,12 @@ export function Brand() {
     <Link
       href="/"
       className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight"
-      aria-label={t("CV Gen home")}
+      aria-label={t("CV App home")}
     >
       <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
         <FileText className="size-4" strokeWidth={2} />
       </span>
-      CV Gen
+      CV App
     </Link>
   )
 }
