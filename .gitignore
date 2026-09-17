@@ -10,7 +10,6 @@
 
 # testing
 /coverage
-/vitest.config.ts
 
 # next.js
 /.next/
@@ -21,10 +20,12 @@
 
 # deployment
 .vercel
+.netlify/
 
 # misc
 .DS_Store
 Thumbs.db
+Desktop.ini
 *.pem
 
 # editor files
@@ -40,6 +41,7 @@ AGENTS.md
 .prettierrc
 
 # debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -48,7 +50,6 @@ pnpm-debug.log*
 # tool caches
 .eslintcache
 .turbo/
-
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
