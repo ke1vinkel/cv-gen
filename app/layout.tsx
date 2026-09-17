@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { LanguageProvider } from "@/components/language-provider"
 import { ThemeProvider } from "@/components/theme-provider"
+import { IframeGuard } from "@/components/iframe-guard"
 import { getLocale } from "@/lib/locale"
 import { cn } from "@/lib/utils"
 
@@ -43,7 +44,9 @@ export default async function RootLayout({
     >
       <body suppressHydrationWarning>
         <LanguageProvider initialLocale={locale}>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <IframeGuard>{children}</IframeGuard>
+          </ThemeProvider>
         </LanguageProvider>
       </body>
     </html>
