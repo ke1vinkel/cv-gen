@@ -5,3 +5,4 @@
 [build.environment]
   # Exclude public client-side environment variables from Netlify's secret scanner
   SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_PORTAL_URL"
+  NODE_VERSION = "24"
